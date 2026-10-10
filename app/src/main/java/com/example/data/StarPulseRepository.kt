@@ -845,6 +845,8 @@ class StarPulseRepository(private val context: Context? = null) {
             PostType.PHOTO -> (25..45).random().toLong()
             PostType.VIDEO -> (45..75).random().toLong()
             PostType.STAR_CLIP -> (60..110).random().toLong()
+            PostType.REEL -> (70..130).random().toLong()
+            PostType.STORY -> (30..65).random().toLong()
         }
 
         val newPost = Post(
@@ -879,7 +881,7 @@ class StarPulseRepository(private val context: Context? = null) {
 
         // Update Developer / User statistics
         val newPostsCount = me.postsCount + 1
-        val newVideosCount = if (type == PostType.VIDEO || type == PostType.STAR_CLIP) me.videosCount + 1 else me.videosCount
+        val newVideosCount = if (type == PostType.VIDEO || type == PostType.STAR_CLIP || type == PostType.REEL) me.videosCount + 1 else me.videosCount
         val newTotalReach = me.totalReach + estimatedReach
 
         _currentUser.value = me.copy(
@@ -896,7 +898,7 @@ class StarPulseRepository(private val context: Context? = null) {
         advanceAchievement("ach_first_post", 1)
         advanceAchievement("ach_reach_100", estimatedReach.toInt())
 
-        if (type == PostType.STAR_CLIP) {
+        if (type == PostType.STAR_CLIP || type == PostType.REEL) {
             advanceTask("task_create", 1)
             advanceAchievement("ach_first_clip", 1)
         }

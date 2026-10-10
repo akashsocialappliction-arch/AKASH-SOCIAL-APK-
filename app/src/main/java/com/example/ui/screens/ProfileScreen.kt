@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,6 +56,7 @@ fun ProfileScreen(
 ) {
     var selectedTab by remember { mutableStateOf("Posts") } // "Posts", "Clips", "Analytics"
     var isEditingProfile by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     if (isEditingProfile) {
         EditProfileDialog(
@@ -527,6 +529,11 @@ fun ProfileScreen(
             }
         }
 
+        // Official App Download & Friends Invite Card (Requirement 4)
+        item {
+            AppDownloadCard()
+        }
+
         // Content Tabs
         item {
             Row(
@@ -607,11 +614,30 @@ fun ProfileScreen(
                             maxLines = 2
                         )
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "❤️ ${post.likesCount} Likes • 💬 ${post.commentsCount} Comments • ${post.timestampText}",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "❤️ ${post.likesCount} • 💬 ${post.commentsCount} • 🔁 ${post.sharesCount} shares • ${post.timestampText}",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            IconButton(
+                                onClick = { sharePostExternally(context, post) },
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .testTag("share_profile_post_${post.id}")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Share,
+                                    contentDescription = "Share",
+                                    tint = StarPrimaryLight,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }

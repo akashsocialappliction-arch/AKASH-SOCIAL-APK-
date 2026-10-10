@@ -50,9 +50,16 @@ fun HomeScreen(
     onOpenSpotlightModal: (SpotlightMetric?) -> Unit,
     onOpenAiHelp: () -> Unit,
     onReportPost: (String) -> Unit,
+    onOpenStoryCamera: () -> Unit = {},
+    onOpenReelCamera: () -> Unit = {},
+    onSharePost: (String) -> Unit = {},
+    onDirectMessagePost: (String, String) -> Unit = { _, _ -> },
+    onShareApp: () -> Unit = {},
+    onNavigateToCreate: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var activeCommentPostId by remember { mutableStateOf<String?>(null) }
+    var activeSharePost by remember { mutableStateOf<Post?>(null) }
     var shareSnackbarVisible by remember { mutableStateOf(false) }
     var repostSnackbarVisible by remember { mutableStateOf(false) }
 
@@ -72,7 +79,9 @@ fun HomeScreen(
                     creators = creators,
                     onCreatorClick = onCreatorClick,
                     onOpenLive = { onOpenLiveStream("live_aarav") },
-                    onStartLive = onStartLive
+                    onStartLive = onStartLive,
+                    onOpenStoryCamera = onOpenStoryCamera,
+                    onOpenReelCamera = onOpenReelCamera
                 )
                 Spacer(modifier = Modifier.height(10.dp))
             }
@@ -103,6 +112,14 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(14.dp))
             }
 
+            // Official APK Download & Social Friends Invite Card (Requirement 4)
+            item {
+                AppDownloadCard(
+                    onShareApp = onShareApp
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
             // Feed Posts
             items(posts) { post ->
                 PostCard(
@@ -111,7 +128,10 @@ fun HomeScreen(
                     onToggleLike = { onToggleLike(post.id) },
                     onToggleSave = { onToggleSave(post.id) },
                     onCommentClick = { activeCommentPostId = post.id },
-                    onShareClick = { shareSnackbarVisible = true },
+                    onShareClick = {
+                        activeSharePost = post
+                        onSharePost(post.id)
+                    },
                     onRepostClick = {
                         onRepostPost(post.id)
                         repostSnackbarVisible = true
@@ -122,6 +142,22 @@ fun HomeScreen(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
+        }
+
+        // Interactive Share Media Bottom Sheet (Direct DM Share + System Share)
+        if (activeSharePost != null) {
+            ShareMediaBottomSheet(
+                post = activeSharePost!!,
+                friends = creators.filter { it.id != currentUser.id },
+                onSendDirectMessage = { partnerId, postId ->
+                    onDirectMessagePost(partnerId, postId)
+                    onSharePost(postId)
+                },
+                onNativeShareComplete = {
+                    onSharePost(activeSharePost!!.id)
+                },
+                onDismiss = { activeSharePost = null }
+            )
         }
 
         // Comments Bottom Sheet
@@ -173,7 +209,9 @@ fun CreatorStoryBar(
     creators: List<User>,
     onCreatorClick: (String) -> Unit,
     onOpenLive: () -> Unit,
-    onStartLive: () -> Unit = onOpenLive
+    onStartLive: () -> Unit = onOpenLive,
+    onOpenStoryCamera: () -> Unit = {},
+    onOpenReelCamera: () -> Unit = {}
 ) {
     LazyRow(
         modifier = Modifier
@@ -182,30 +220,105 @@ fun CreatorStoryBar(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // You (Your Story / Pulse)
+        // Add Story (Your Pulse + Camera trigger)
         item {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .clickable { onCreatorClick(currentUser.id) }
+                    .clickable { onOpenStoryCamera() }
                     .testTag("story_current_user")
             ) {
                 Box(
                     modifier = Modifier
                         .size(62.dp)
                         .clip(CircleShape)
-                        .border(2.dp, StarPrimary, CircleShape)
-                        .padding(3.dp),
+                        .background(
+                            brush = Brush.linearGradient(
+                                listOf(Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFFF59E0B))
+                            )
+                        )
+                        .padding(2.5.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    UserAvatar(user = currentUser, size = 54.dp)
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        UserAvatar(user = currentUser, size = 54.dp)
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .background(StarPrimary)
+                                .border(1.5.dp, Color.Black, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = "Add Story",
+                                tint = Color.White,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Your Pulse",
+                    text = "Add Story ✨",
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        // New Reel Quick Action Button
+        item {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clickable { onOpenReelCamera() }
+                    .testTag("story_new_reel_button")
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(62.dp)
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.linearGradient(
+                                listOf(StarPrimary, ReachCyanGlow)
+                            )
+                        )
+                        .padding(2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(CosmicDarkSurface),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Filled.Videocam,
+                                contentDescription = "Record Reel",
+                                tint = ReachCyanGlow,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "REEL",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "New Reel 🎬",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ReachCyanGlow
                 )
             }
         }
@@ -700,6 +813,8 @@ fun PostCard(
                             PostType.PHOTO -> StarPrimary.copy(alpha = 0.15f)
                             PostType.VIDEO -> StreakFlame.copy(alpha = 0.15f)
                             PostType.STAR_CLIP -> ReachCyan.copy(alpha = 0.15f)
+                            PostType.REEL -> Color(0xFFE11D48).copy(alpha = 0.15f)
+                            PostType.STORY -> Color(0xFF8B5CF6).copy(alpha = 0.15f)
                         }
                     ) {
                         Text(
@@ -707,6 +822,8 @@ fun PostCard(
                                 PostType.PHOTO -> "Photo"
                                 PostType.VIDEO -> "Video"
                                 PostType.STAR_CLIP -> "StarClip 🎬"
+                                PostType.REEL -> "Reel 🎬"
+                                PostType.STORY -> "Story ✨"
                             },
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
@@ -714,6 +831,8 @@ fun PostCard(
                                 PostType.PHOTO -> StarPrimaryLight
                                 PostType.VIDEO -> StreakFlameLight
                                 PostType.STAR_CLIP -> ReachCyanGlow
+                                PostType.REEL -> Color(0xFFFB7185)
+                                PostType.STORY -> Color(0xFFC084FC)
                             },
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                         )
@@ -748,8 +867,13 @@ fun PostCard(
                     )
                 }
                 Spacer(modifier = Modifier.height(10.dp))
-            } else if (post.type == PostType.STAR_CLIP) {
+            } else if (post.type == PostType.STAR_CLIP || post.type == PostType.REEL || post.type == PostType.STORY) {
                 // Short-form vertical preview canvas
+                val typeLabel = when (post.type) {
+                    PostType.REEL -> "Reel Video 🎬 • ${if (post.videoDurationSeconds > 0) "${post.videoDurationSeconds}s" else "45s"}"
+                    PostType.STORY -> "Story ✨ • ${if (post.videoDurationSeconds > 0) "${post.videoDurationSeconds}s" else "Captured Photo"}"
+                    else -> "StarClip Video • ${post.videoDurationSeconds}s"
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -772,14 +896,14 @@ fun PostCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.PlayArrow,
-                                contentDescription = "Play StarClip",
+                                contentDescription = "Play Media",
                                 tint = Color.White,
                                 modifier = Modifier.size(30.dp)
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "StarClip Video • ${post.videoDurationSeconds}s",
+                            text = typeLabel,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White

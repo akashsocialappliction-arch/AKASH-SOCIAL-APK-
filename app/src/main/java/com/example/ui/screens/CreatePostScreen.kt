@@ -46,10 +46,24 @@ fun CreatePostScreen(
     var selectedMentions by remember { mutableStateOf(emptyList<String>()) }
     var attachSampleArtwork by remember { mutableStateOf(false) }
     var isCameraOpen by remember { mutableStateOf(false) }
+    var cameraMode by remember { mutableStateOf(CameraMode.REEL) }
     var recordedVideoDuration by remember { mutableStateOf<Int?>(null) }
 
     if (isCameraOpen) {
         CameraCaptureScreen(
+            initialMode = cameraMode,
+            onMediaCaptured = { result ->
+                recordedVideoDuration = result.durationSeconds
+                if (result.caption.isNotBlank() && captionText.isBlank()) {
+                    captionText = result.caption
+                }
+                if (result.mode == CameraMode.REEL) {
+                    selectedType = PostType.REEL
+                } else if (result.mode == CameraMode.STORY) {
+                    selectedType = PostType.STORY
+                }
+                isCameraOpen = false
+            },
             onVideoCaptured = { duration ->
                 recordedVideoDuration = duration
                 isCameraOpen = false
@@ -113,7 +127,7 @@ fun CreatePostScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Post Type Tabs: Photo, Video, StarClip
+        // Post Type Tabs: Photo, Reel, Story, Video, StarClip
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -123,9 +137,11 @@ fun CreatePostScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             listOf(
-                PostType.PHOTO to "📷 Photo Post",
-                PostType.VIDEO to "🎥 Video Post",
-                PostType.STAR_CLIP to "⚡ StarClip"
+                PostType.PHOTO to "📷 Photo",
+                PostType.REEL to "🎬 Reel",
+                PostType.STORY to "✨ Story",
+                PostType.VIDEO to "🎥 Video",
+                PostType.STAR_CLIP to "⚡ Clip"
             ).forEach { (type, label) ->
                 val isSelected = selectedType == type
                 Box(
@@ -140,7 +156,7 @@ fun CreatePostScreen(
                 ) {
                     Text(
                         text = label,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
                     )
@@ -148,8 +164,21 @@ fun CreatePostScreen(
             }
         }
 
-        // Camera Capture Action for Video & StarClip
-        if (selectedType == PostType.VIDEO || selectedType == PostType.STAR_CLIP) {
+        // Camera Capture Action for Reel, Story, Video & StarClip
+        if (selectedType != PostType.PHOTO) {
+            val isStory = selectedType == PostType.STORY
+            val isReel = selectedType == PostType.REEL
+            val modeTitle = when {
+                isStory -> "Capture Story with CameraX"
+                isReel -> "Record Reel with CameraX"
+                else -> "Capture Video with CameraX"
+            }
+            val modeSubtitle = when {
+                isStory -> "Snap high-res photo or 15s Story clip"
+                isReel -> "Record vertical 1080p Reel with studio audio"
+                else -> "Record native camera video in real-time"
+            }
+
             Spacer(modifier = Modifier.height(14.dp))
             Surface(
                 shape = RoundedCornerShape(16.dp),
@@ -177,7 +206,7 @@ fun CreatePostScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (recordedVideoDuration != null) Icons.Filled.Check else Icons.Filled.Videocam,
+                                imageVector = if (recordedVideoDuration != null) Icons.Filled.Check else if (isStory) Icons.Filled.AutoAwesome else Icons.Filled.Videocam,
                                 contentDescription = null,
                                 tint = Color.Black,
                                 modifier = Modifier.size(24.dp)
@@ -186,13 +215,13 @@ fun CreatePostScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = if (recordedVideoDuration != null) "Camera Video Captured (${recordedVideoDuration}s)" else "Capture with CameraX",
+                                text = if (recordedVideoDuration != null) "Camera Captured (${recordedVideoDuration}s)" else modeTitle,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (recordedVideoDuration != null) "Ready to share with your Fans & Friends ✓" else "Record native camera video in real-time",
+                                text = if (recordedVideoDuration != null) "Ready to share with your Fans & Friends ✓" else modeSubtitle,
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -200,7 +229,10 @@ fun CreatePostScreen(
                     }
 
                     Button(
-                        onClick = { isCameraOpen = true },
+                        onClick = {
+                            cameraMode = if (isStory) CameraMode.STORY else CameraMode.REEL
+                            isCameraOpen = true
+                        },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (recordedVideoDuration != null) MaterialTheme.colorScheme.surfaceVariant else ReachCyan
                         ),
@@ -208,7 +240,7 @@ fun CreatePostScreen(
                         modifier = Modifier.testTag("open_camera_capture_button")
                     ) {
                         Text(
-                            text = if (recordedVideoDuration != null) "Retake" else "Record",
+                            text = if (recordedVideoDuration != null) "Retake" else if (isStory) "Capture" else "Record",
                             color = if (recordedVideoDuration != null) MaterialTheme.colorScheme.onSurface else Color.Black,
                             fontWeight = FontWeight.Bold
                         )
@@ -455,11 +487,13 @@ fun CreatePostScreen(
                         PostType.PHOTO -> "Sharing new creator concept art on StarPulse! 🚀"
                         PostType.VIDEO -> "New studio workflow video. Check out the creative process!"
                         PostType.STAR_CLIP -> "Daily StarClip: Building momentum and keeping our streak alive! 🔥"
+                        PostType.REEL -> "New Reel clip recorded with CameraX! 🎬 #Reels #AKASHSOCIAL"
+                        PostType.STORY -> "Moments on AKASH SOCIAL ✨ #DailyStory"
                     }
                 } else captionText
 
                 val mediaRes = if (attachSampleArtwork) R.drawable.post_artwork else null
-                val duration = recordedVideoDuration ?: (if (selectedType == PostType.STAR_CLIP) 38 else if (selectedType == PostType.VIDEO) 65 else 0)
+                val duration = recordedVideoDuration ?: (if (selectedType == PostType.REEL) 45 else if (selectedType == PostType.STAR_CLIP) 38 else if (selectedType == PostType.VIDEO) 65 else 0)
 
                 onPublish(selectedType, finalCaption, selectedHashtags, selectedMentions, mediaRes, duration)
             },

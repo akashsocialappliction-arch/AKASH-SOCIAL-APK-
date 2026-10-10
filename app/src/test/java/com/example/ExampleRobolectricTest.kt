@@ -26,9 +26,10 @@ class ExampleRobolectricTest {
     val repo = StarPulseRepository()
     val me = repo.currentUser.value
 
-    assertEquals("Akash", me.name)
+    assertEquals("Akash Singh Parihar", me.name)
     assertEquals("@akash_dev", me.username)
     assertTrue(me.isDeveloper)
+    assertTrue(me.isOwner)
     assertEquals(0, me.fansCount)
     assertEquals(0, me.friendsCount)
     assertEquals(0, me.postsCount)
@@ -81,5 +82,55 @@ class ExampleRobolectricTest {
     assertEquals(initialPosts + 1, updatedUser.postsCount)
     assertTrue(updatedUser.totalReach > initialReach)
     assertEquals(1, updatedUser.streakDays)
+  }
+
+  @Test
+  fun `create reel and story with CameraX duration advances video counts`() {
+    val repo = StarPulseRepository()
+    val initialVideos = repo.currentUser.value.videosCount
+
+    repo.createPost(
+      type = PostType.REEL,
+      caption = "Fresh CameraX Reel recording",
+      hashtags = listOf("#Reels", "#AkashSocial"),
+      mentions = emptyList(),
+      durationSeconds = 24
+    )
+
+    val userAfterReel = repo.currentUser.value
+    assertEquals(initialVideos + 1, userAfterReel.videosCount)
+
+    repo.createPost(
+      type = PostType.STORY,
+      caption = "Daily story snap",
+      hashtags = listOf("#DailyStory"),
+      mentions = emptyList(),
+      durationSeconds = 0
+    )
+
+    val latestPost = repo.posts.value.first()
+    assertEquals(PostType.STORY, latestPost.type)
+  }
+
+  @Test
+  fun `share post and send post attachment to friend updates metrics`() {
+    val repo = StarPulseRepository()
+    val initialShares = repo.currentUser.value.sharesCount
+    val targetPost = repo.posts.value.first()
+    val initialPostShares = targetPost.sharesCount
+
+    repo.sharePost(targetPost.id)
+
+    val userAfterShare = repo.currentUser.value
+    assertEquals(initialShares + 1, userAfterShare.sharesCount)
+
+    val updatedPost = repo.posts.value.first { it.id == targetPost.id }
+    assertEquals(initialPostShares + 1, updatedPost.sharesCount)
+
+    // Direct message with shared post attachment
+    repo.sendMessage("user_aarav", "Check out this reel!", sharedPostId = targetPost.id)
+    val msgs = repo.activeChatMessages.value["user_aarav"]
+    assertNotNull(msgs)
+    assertTrue(msgs!!.any { it.sharedPostId == targetPost.id })
   }
 }

@@ -11,14 +11,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.model.CallType
+import com.example.model.PostType
 import com.example.ui.MainTab
 import com.example.ui.StarPulseViewModel
 import com.example.ui.components.StarPulseBottomBar
 import com.example.ui.components.StarPulseTopBar
+import com.example.ui.components.shareAppInvite
 import com.example.ui.screens.*
 import com.example.ui.theme.StarPulseTheme
 
@@ -36,6 +42,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
+    val context = LocalContext.current
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val creators by viewModel.creators.collectAsStateWithLifecycle()
@@ -64,6 +71,10 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
     val spotlightFilter by viewModel.spotlightFilter.collectAsStateWithLifecycle()
     val reportingTarget by viewModel.reportingTarget.collectAsStateWithLifecycle()
 
+    // Camera Studio (Reels & Stories CameraX Viewfinder)
+    var isCameraStudioOpen by remember { mutableStateOf(false) }
+    var activeCameraMode by remember { mutableStateOf(CameraMode.STORY) }
+
     // Music & AI Assistant states
     val audioTracks by viewModel.audioTracks.collectAsStateWithLifecycle()
     val playingAudioId by viewModel.playingAudioId.collectAsStateWithLifecycle()
@@ -81,6 +92,7 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
     BackHandler(
         enabled = activeCall != null ||
                 activeLiveStreamId != null ||
+                isCameraStudioOpen ||
                 activeChatUserId != null ||
                 isViewingConversations ||
                 isViewingNotifications ||
@@ -91,6 +103,7 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
         when {
             activeCall != null -> viewModel.endCall()
             activeLiveStreamId != null -> viewModel.closeLiveStream()
+            isCameraStudioOpen -> isCameraStudioOpen = false
             activeChatUserId != null -> viewModel.closeChat()
             isViewingConversations -> viewModel.closeConversationsList()
             isViewingNotifications -> viewModel.closeNotifications()
@@ -124,6 +137,33 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
             onSendSpark = { viewModel.sendLiveSpark(stream.id) },
             onToggleFan = { viewModel.toggleFan(stream.creator.id) },
             onClose = { viewModel.closeLiveStream() }
+        )
+        return
+    }
+
+    // Camera Studio (Reels & Stories CameraX Viewfinder) takes third priority
+    if (isCameraStudioOpen) {
+        CameraCaptureScreen(
+            initialMode = activeCameraMode,
+            onMediaCaptured = { result ->
+                isCameraStudioOpen = false
+                val type = if (result.mode == CameraMode.STORY) PostType.STORY else PostType.REEL
+                val defaultCaption = if (result.caption.isNotBlank()) {
+                    result.caption
+                } else if (result.mode == CameraMode.STORY) {
+                    "Moments on AKASH SOCIAL ✨ #DailyStory"
+                } else {
+                    "New Reel video recorded with CameraX! 🎬 #Reels #Creator"
+                }
+                viewModel.createPost(
+                    type = type,
+                    caption = defaultCaption,
+                    hashtags = if (result.mode == CameraMode.STORY) listOf("#DailyStory", "#AkashSocial") else listOf("#Reels", "#AkashSocial"),
+                    mentions = emptyList(),
+                    durationSeconds = result.durationSeconds
+                )
+            },
+            onClose = { isCameraStudioOpen = false }
         )
         return
     }
@@ -285,7 +325,26 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
                                 onOpenLiveStream = { streamId -> viewModel.openLiveStream(streamId) },
                                 onOpenSpotlightModal = { metric -> viewModel.openSpotlightModal(metric) },
                                 onOpenAiHelp = { viewModel.openAiHelp() },
-                                onReportPost = { postId -> viewModel.promptReport("POST", postId) }
+                                onReportPost = { postId -> viewModel.promptReport("POST", postId) },
+                                onOpenStoryCamera = {
+                                    activeCameraMode = CameraMode.STORY
+                                    isCameraStudioOpen = true
+                                },
+                                onOpenReelCamera = {
+                                    activeCameraMode = CameraMode.REEL
+                                    isCameraStudioOpen = true
+                                },
+                                onSharePost = { postId -> viewModel.sharePost(postId) },
+                                onDirectMessagePost = { partnerId, postId ->
+                                    viewModel.sendMessage(
+                                        partnerId = partnerId,
+                                        text = "Shared a post with you on AKASH SOCIAL 🚀",
+                                        sharedPostId = postId
+                                    )
+                                },
+                                onShareApp = {
+                                    shareAppInvite(context)
+                                }
                             )
                         }
 

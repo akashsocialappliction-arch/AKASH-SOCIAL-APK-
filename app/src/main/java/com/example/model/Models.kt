@@ -3,7 +3,9 @@ package com.example.model
 enum class PostType {
     PHOTO,
     VIDEO,
-    STAR_CLIP
+    STAR_CLIP,
+    REEL,
+    STORY
 }
 
 data class User(

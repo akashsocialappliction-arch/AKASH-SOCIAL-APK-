@@ -11,28 +11,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
+// Refined Material 3 Dark Color Scheme (Professional Slate / Deep Blue)
 private val DarkColorScheme = darkColorScheme(
     primary = StarPrimaryLight,
-    onPrimary = Color.Black,
+    onPrimary = Color.White,
     primaryContainer = StarPrimaryVariant,
     onPrimaryContainer = Color.White,
     secondary = VipGold,
-    onSecondary = Color.Black,
+    onSecondary = Color(0xFF1E1402),
     secondaryContainer = VipGoldDark,
     onSecondaryContainer = VipGoldLight,
-    tertiary = ReachCyan,
-    onTertiary = Color.Black,
-    tertiaryContainer = Color(0xFF0891B2),
-    onTertiaryContainer = ReachCyanGlow,
+    tertiary = ReachCyanGlow,
+    onTertiary = Color(0xFF021B24),
+    tertiaryContainer = ReachCyan,
+    onTertiaryContainer = Color.White,
     background = CosmicDarkBg,
     onBackground = CosmicDarkText,
     surface = CosmicDarkSurface,
     onSurface = CosmicDarkText,
     surfaceVariant = CosmicDarkCard,
     onSurfaceVariant = CosmicDarkTextMuted,
-    outline = CosmicDarkBorder
+    outline = CosmicDarkBorder,
+    outlineVariant = Color(0xFF1E283D)
 )
 
+// Refined Material 3 Light Color Scheme (Crisp Minimalist Studio)
 private val LightColorScheme = lightColorScheme(
     primary = StarPrimary,
     onPrimary = Color.White,
@@ -41,22 +44,25 @@ private val LightColorScheme = lightColorScheme(
     secondary = VipGoldDark,
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFFEF3C7),
-    onSecondaryContainer = Color(0xFF92400E),
+    onSecondaryContainer = Color(0xFF78350F),
     tertiary = ReachCyan,
     onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFE0F2FE),
+    onTertiaryContainer = Color(0xFF0369A1),
     background = LightBg,
     onBackground = LightText,
     surface = LightSurface,
     onSurface = LightText,
     surfaceVariant = LightCard,
     onSurfaceVariant = LightTextMuted,
-    outline = LightBorder
+    outline = LightBorder,
+    outlineVariant = Color(0xFFCBD5E1)
 )
 
 @Composable
 fun StarPulseTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // Keep StarPulse distinctive brand colors
+    dynamicColor: Boolean = false, // Preserve AKASH SOCIAL distinct branding
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

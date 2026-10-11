@@ -51,12 +51,25 @@ fun ProfileScreen(
     onBlockUser: (String) -> Unit,
     onReportUser: (String) -> Unit,
     onUpdateProfile: (String, String, String, String?) -> Result<Unit> = { _, _, _, _ -> Result.success(Unit) },
+    onOpenCategories: () -> Unit = {},
+    onLinkAccount: () -> Unit = {},
+    savedAccounts: List<User> = emptyList(),
+    onSwitchAccount: (String) -> Unit = {},
+    onCreateNewAccount: (String, String, String, Boolean) -> Unit = { _, _, _, _ -> },
+    isLoading: Boolean = false,
     onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableStateOf("Posts") } // "Posts", "Clips", "Analytics"
     var isEditingProfile by remember { mutableStateOf(false) }
+    var isAccountSwitcherOpen by remember { mutableStateOf(false) }
+    var isCreateAccountOpen by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    if (isLoading) {
+        ProfileSkeletonLoading(modifier = modifier)
+        return
+    }
 
     if (isEditingProfile) {
         EditProfileDialog(
@@ -64,6 +77,34 @@ fun ProfileScreen(
             onSave = onUpdateProfile,
             onDismiss = { isEditingProfile = false }
         )
+    }
+
+    if (isAccountSwitcherOpen) {
+        AccountSwitcherBottomSheet(
+            currentUserId = user.id,
+            accounts = if (savedAccounts.isNotEmpty()) savedAccounts else listOf(user),
+            onSwitchAccount = onSwitchAccount,
+            onOpenCreateAccount = { isCreateAccountOpen = true },
+            onDismiss = { isAccountSwitcherOpen = false }
+        )
+    }
+
+    if (isCreateAccountOpen) {
+        CreateAccountDialog(
+            onConfirm = { name, username, bio, isCreator ->
+                onCreateNewAccount(name, username, bio, isCreator)
+            },
+            onDismiss = { isCreateAccountOpen = false }
+        )
+    }
+
+    // Filter posts according to active tab
+    val filteredPosts = remember(selectedTab, userPosts) {
+        when (selectedTab) {
+            "Clips" -> userPosts.filter { it.type == PostType.STAR_CLIP || it.type == PostType.REEL || it.type == PostType.VIDEO }
+            "Posts" -> userPosts.filter { it.type == PostType.PHOTO || it.type == PostType.STORY || (it.type != PostType.STAR_CLIP && it.type != PostType.REEL) }
+            else -> userPosts
+        }
     }
 
     LazyColumn(
@@ -87,7 +128,7 @@ fun ProfileScreen(
                         Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                     Text(
-                        text = user.username,
+                        text = user.username.removePrefix("@"),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -172,12 +213,30 @@ fun ProfileScreen(
                             Text("🌟", fontSize = 16.sp)
                         }
                     }
-                    Text(
-                        text = user.username,
-                        fontSize = 13.sp,
-                        color = StarPrimaryLight,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = if (isCurrentUser) Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { isAccountSwitcherOpen = true }
+                            .padding(vertical = 2.dp)
+                        else Modifier
+                    ) {
+                        Text(
+                            text = user.username.removePrefix("@"),
+                            fontSize = 13.sp,
+                            color = StarPrimaryLight,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (isCurrentUser) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Filled.ArrowDropDown,
+                                contentDescription = "Switch Account",
+                                tint = StarPrimaryLight,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -351,7 +410,7 @@ fun ProfileScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .testTag("profile_edit_button")
-                                ) {
+                                 ) {
                                     Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("Edit Profile", fontSize = 12.sp)
@@ -380,6 +439,32 @@ fun ProfileScreen(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text("Support", fontSize = 12.sp)
                                 }
+                            }
+
+                            // Switch Account / Multi-Profile on Device
+                            OutlinedButton(
+                                onClick = { isAccountSwitcherOpen = true },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surface
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("switch_account_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.SwitchAccount,
+                                    contentDescription = null,
+                                    tint = ReachCyanGlow,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Switch Account / Multi-Profile (${if (savedAccounts.isNotEmpty()) savedAccounts.size else 1})",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                             }
 
                             if (user.isOwner || user.id == "user_akash_dev") {
@@ -565,8 +650,42 @@ fun ProfileScreen(
             }
         }
 
-        // Published Items
-        if (userPosts.isEmpty()) {
+        // Published Items or Tab Content
+        if (selectedTab == "Analytics") {
+            item {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth().testTag("profile_analytics_tab_content")
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("📈", fontSize = 18.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Audience Reach & Media Performance",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "• Total Content Reach: ${user.totalReach} accounts reached\n" +
+                                   "• Community Fans: ${user.fansCount} • Mutual Friends: ${user.friendsCount}\n" +
+                                   "• Published Posts: ${userPosts.count { it.type == PostType.PHOTO || it.type == PostType.STORY }}\n" +
+                                   "• Published StarClips & Reels: ${userPosts.count { it.type == PostType.STAR_CLIP || it.type == PostType.REEL || it.type == PostType.VIDEO }}\n" +
+                                   "• Creator Activity Streak: ${user.streakDays} Days Active 🔥\n" +
+                                   "• VIP Star Status: ${if (user.vipStarActive) "Active (Verified)" else "Inactive"}",
+                            fontSize = 13.sp,
+                            lineHeight = 22.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        } else if (filteredPosts.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier
@@ -575,10 +694,10 @@ fun ProfileScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("✨", fontSize = 28.sp)
+                        Text(if (selectedTab == "Clips") "🎬" else "✨", fontSize = 28.sp)
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "No content published yet",
+                            text = if (selectedTab == "Clips") "No StarClips or Reels published yet" else "No posts published yet",
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -586,7 +705,7 @@ fun ProfileScreen(
                 }
             }
         } else {
-            items(userPosts) { post ->
+            items(filteredPosts) { post ->
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surface,
@@ -652,7 +771,7 @@ fun EditProfileDialog(
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf(user.name) }
-    var username by remember { mutableStateOf(user.username) }
+    var username by remember { mutableStateOf(user.username.removePrefix("@")) }
     var bio by remember { mutableStateOf(user.bio) }
     var avatarUri by remember { mutableStateOf(user.avatarUri) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -740,15 +859,15 @@ fun EditProfileDialog(
                     modifier = Modifier.fillMaxWidth().testTag("edit_profile_name_input")
                 )
 
-                // Username Field
+                // Username Field (App usernames do not include @)
                 OutlinedTextField(
                     value = username,
                     onValueChange = {
-                        username = it
+                        username = it.removePrefix("@")
                         errorMessage = null
                     },
-                    label = { Text("Username (@handle)") },
-                    supportingText = { Text("Unique handle across AKASH SOCIAL") },
+                    label = { Text("Username (without @)") },
+                    supportingText = { Text("Unique username on AKASH SOCIAL (e.g. akashsingh, creator123)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("edit_profile_username_input")
                 )

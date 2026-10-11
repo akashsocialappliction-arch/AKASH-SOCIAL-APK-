@@ -1,175 +1,441 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download AKASH SOCIAL NAGOD APK</title>
+    <title>AKASH SOCIAL NAGOD — Official Android APK Download</title>
+    <link rel="icon" type="image/png" href="/app/src/main/res/drawable/ic_launcher_foreground.png">
     <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #090D16 0%, #111827 50%, #06090F 100%);
+            --card-bg: rgba(17, 24, 39, 0.92);
+            --card-border: rgba(99, 102, 241, 0.28);
+            --card-shadow: 0 24px 48px rgba(0, 0, 0, 0.65), 0 0 40px rgba(79, 70, 229, 0.12);
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-muted: #64748B;
+            --primary-accent: #6366F1;
+            --primary-gradient: linear-gradient(135deg, #4F46E5 0%, #06B6D4 100%);
+            --instructions-bg: rgba(15, 23, 42, 0.75);
+            --instructions-border: rgba(255, 255, 255, 0.08);
+            --secondary-btn-bg: rgba(255, 255, 255, 0.06);
+            --secondary-btn-border: rgba(255, 255, 255, 0.14);
+            --secondary-btn-text: #E2E8F0;
+            --badge-bg: rgba(99, 102, 241, 0.14);
+            --badge-border: rgba(99, 102, 241, 0.35);
+            --badge-color: #818CF8;
+            --toggle-bg: rgba(255, 255, 255, 0.12);
+            --toggle-thumb: #F8FAFC;
+        }
+
+        html[data-theme="light"] {
+            --bg-gradient: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 50%, #CBD5E1 100%);
+            --card-bg: rgba(255, 255, 255, 0.96);
+            --card-border: rgba(99, 102, 241, 0.22);
+            --card-shadow: 0 20px 40px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.05);
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+            --text-muted: #64748B;
+            --primary-accent: #4F46E5;
+            --primary-gradient: linear-gradient(135deg, #4F46E5 0%, #0284C7 100%);
+            --instructions-bg: #F8FAFC;
+            --instructions-border: rgba(226, 232, 240, 1);
+            --secondary-btn-bg: #F1F5F9;
+            --secondary-btn-border: #CBD5E1;
+            --secondary-btn-text: #1E293B;
+            --badge-bg: rgba(79, 70, 229, 0.08);
+            --badge-border: rgba(79, 70, 229, 0.25);
+            --badge-color: #4338CA;
+            --toggle-bg: #CBD5E1;
+            --toggle-thumb: #4F46E5;
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
         }
+
         body {
-            background: linear-gradient(135deg, #0B0F17 0%, #151D2A 50%, #070A0F 100%);
-            color: #FFFFFF;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 24px 16px;
         }
+
         .container {
-            max-width: 440px;
+            max-width: 460px;
             width: 100%;
-            background: rgba(22, 27, 34, 0.85);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(0, 210, 255, 0.25);
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--card-border);
             border-radius: 28px;
-            padding: 32px 24px;
+            padding: 28px 24px;
             text-align: center;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 40px rgba(0, 210, 255, 0.12);
+            box-shadow: var(--card-shadow);
+            position: relative;
         }
+
+        /* Top Bar: Brand Tag and Theme Toggle Switch */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .platform-tag {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .platform-dot {
+            width: 7px;
+            height: 7px;
+            background: #10B981;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 6px #10B981;
+        }
+
+        /* Theme Toggle Switch */
+        .theme-toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--toggle-bg);
+            padding: 4px 8px;
+            border-radius: 20px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .theme-toggle-icon {
+            font-size: 13px;
+            line-height: 1;
+        }
+
+        .theme-switch {
+            position: relative;
+            width: 38px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            display: inline-block;
+            transition: background 0.2s;
+        }
+
+        .theme-switch-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: var(--toggle-thumb);
+            border-radius: 50%;
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        html[data-theme="light"] .theme-switch-slider {
+            transform: translateX(18px);
+        }
+
+        /* App Icon & Branding */
         .icon-wrapper {
-            width: 96px;
-            height: 96px;
-            margin: 0 auto 18px;
-            border-radius: 24px;
+            width: 88px;
+            height: 88px;
+            margin: 0 auto 16px;
+            border-radius: 22px;
             overflow: hidden;
-            box-shadow: 0 10px 25px rgba(0, 210, 255, 0.35);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.35);
             border: 2px solid rgba(255, 255, 255, 0.2);
             background: #0B0F17;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+
         .icon-wrapper img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
+
         h1 {
-            font-size: 24px;
+            font-size: 23px;
             font-weight: 800;
-            letter-spacing: -0.5px;
+            letter-spacing: -0.4px;
             margin-bottom: 6px;
-            background: linear-gradient(90deg, #FFFFFF 0%, #00D2FF 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--text-primary);
         }
+
         .badge-row {
             display: flex;
             justify-content: center;
-            gap: 8px;
-            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 14px;
         }
+
         .badge {
             font-size: 11px;
             font-weight: 700;
             padding: 4px 10px;
             border-radius: 20px;
-            background: rgba(0, 210, 255, 0.12);
-            color: #00D2FF;
-            border: 1px solid rgba(0, 210, 255, 0.3);
+            background: var(--badge-bg);
+            color: var(--badge-color);
+            border: 1px solid var(--badge-border);
         }
+
         .badge-green {
             background: rgba(16, 185, 129, 0.12);
             color: #10B981;
             border: 1px solid rgba(16, 185, 129, 0.3);
         }
+
         p.desc {
-            font-size: 14px;
-            color: #94A3B8;
+            font-size: 13.5px;
+            color: var(--text-secondary);
             line-height: 1.5;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
+
+        /* Download Button & Processing States */
+        .download-box {
+            margin-bottom: 16px;
+            position: relative;
+        }
+
         .btn-download {
-            display: block;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
             width: 100%;
-            padding: 16px 20px;
-            background: linear-gradient(135deg, #00D2FF 0%, #7928CA 100%);
+            padding: 15px 20px;
+            background: var(--primary-gradient);
             color: #FFFFFF;
-            font-size: 17px;
-            font-weight: 800;
+            font-size: 16px;
+            font-weight: 700;
             text-decoration: none;
-            border-radius: 18px;
-            box-shadow: 0 8px 24px rgba(0, 210, 255, 0.4);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-            margin-bottom: 12px;
+            border-radius: 16px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(79, 70, 229, 0.38);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease;
         }
+
         .btn-download:active {
-            transform: scale(0.98);
+            transform: scale(0.985);
         }
+
+        .btn-download:disabled {
+            opacity: 0.85;
+            cursor: not-allowed;
+        }
+
+        /* Spinner Animation */
+        .spinner {
+            display: none;
+            width: 18px;
+            height: 18px;
+            border: 2.5px solid rgba(255, 255, 255, 0.35);
+            border-top-color: #FFFFFF;
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Progress Bar Container */
+        .progress-container {
+            display: none;
+            margin-top: 10px;
+            background: rgba(0, 0, 0, 0.12);
+            border: 1px solid var(--instructions-border);
+            border-radius: 12px;
+            padding: 10px 14px;
+            text-align: left;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(148, 163, 184, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #6366F1, #06B6D4);
+            border-radius: 4px;
+            transition: width 0.15s ease-out;
+        }
+
+        .progress-status-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 5px;
+            font-weight: 500;
+        }
+
         .btn-secondary {
             display: block;
             width: 100%;
             padding: 12px 16px;
-            background: rgba(255, 255, 255, 0.08);
-            color: #CBD5E1;
-            font-size: 14px;
+            background: var(--secondary-btn-bg);
+            color: var(--secondary-btn-text);
+            font-size: 13.5px;
             font-weight: 600;
             text-decoration: none;
             border-radius: 14px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            margin-bottom: 24px;
+            border: 1px solid var(--secondary-btn-border);
+            margin-bottom: 20px;
         }
+
         .instructions {
             text-align: left;
-            background: rgba(15, 23, 42, 0.6);
+            background: var(--instructions-bg);
+            border: 1px solid var(--instructions-border);
             border-radius: 16px;
             padding: 16px;
-            font-size: 13px;
-            color: #94A3B8;
+            font-size: 12.5px;
+            color: var(--text-secondary);
             line-height: 1.6;
         }
+
         .instructions h3 {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 700;
-            color: #E2E8F0;
+            color: var(--text-primary);
             margin-bottom: 8px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.6px;
         }
+
         .instructions ol {
             padding-left: 18px;
         }
+
         .instructions li {
             margin-bottom: 4px;
         }
+
         .footer {
-            margin-top: 20px;
+            margin-top: 18px;
             font-size: 11px;
-            color: #64748B;
+            color: var(--text-muted);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Top Bar: Platform Indicator & Theme Toggle Switch -->
+        <div class="top-bar">
+            <div class="platform-tag">
+                <span class="platform-dot"></span>
+                <span>Nagod Verified Release</span>
+            </div>
+
+            <!-- Theme Toggle Switch -->
+            <div class="theme-toggle-container" id="themeToggleBtn" title="Toggle Light / Dark Theme">
+                <span class="theme-toggle-icon">🌙</span>
+                <div class="theme-switch">
+                    <div class="theme-switch-slider"></div>
+                </div>
+                <span class="theme-toggle-icon">☀️</span>
+            </div>
+        </div>
+
+        <!-- App Icon -->
         <div class="icon-wrapper">
             <img src="/app/src/main/res/drawable/ic_akash_social_logo.jpg" alt="AKASH SOCIAL Logo">
         </div>
+
         <h1>AKASH SOCIAL NAGOD</h1>
+
         <div class="badge-row">
-            <span class="badge">Version 1.0 Release</span>
+            <span class="badge">v1.0.0 Stable</span>
             <span class="badge badge-green">✓ Verified APK (24 MB)</span>
             <span class="badge">Android 7.0 - 15+</span>
         </div>
-        <p class="desc">Official Native Android APK with CameraX Recording, Music Library, Fans & Friends System, and Gemini AI Assistant.</p>
 
-        <!-- Direct Download Button -->
-        <a href="/AKASH_SOCIAL_NAGOD.apk" download="AKASH_SOCIAL_NAGOD.apk" class="btn-download">
-            ⬇️ Download APK (Direct Install)
-        </a>
+        <p class="desc">
+            The authentic social network for creators: vertical video Reels, CameraX recording, real fans & mutual friendships, and direct private messaging.
+        </p>
 
+        <!-- Download Action with Visual Progress Bar & Spinner Animation -->
+        <div class="download-box">
+            <button id="downloadBtn" class="btn-download" type="button">
+                <span id="downloadSpinner" class="spinner"></span>
+                <span id="downloadBtnIcon">⬇️</span>
+                <span id="downloadBtnText">Download APK (Direct Install)</span>
+            </button>
+
+            <!-- Progress Bar & Processing Status -->
+            <div id="progressContainer" class="progress-container">
+                <div class="progress-header">
+                    <span id="progressPhaseText">Fetching release package...</span>
+                    <span id="progressPercentage">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="progressBarFill" class="progress-bar-fill"></div>
+                </div>
+                <div id="progressStatusSubtext" class="progress-status-text">
+                    Connecting to release server (AKASH_SOCIAL_NAGOD.apk)...
+                </div>
+            </div>
+        </div>
+
+        <!-- Universal Release APK Secondary Mirror -->
         <a href="/build-outputs/AKASH_SOCIAL_NAGOD_universal.apk" download="AKASH_SOCIAL_NAGOD_universal.apk" class="btn-secondary">
             Mirror Link: Universal Release APK
         </a>
 
+        <!-- Install Instructions -->
         <div class="instructions">
             <h3>⚡ Quick 3-Step Install:</h3>
             <ol>
-                <li>Tap <b>Download APK</b> above.</li>
-                <li>When download finishes, tap the file in your notifications or <b>Files &gt; Downloads</b>.</li>
-                <li>Tap <b>Install</b> (if asked, toggle <i>Allow from this source</i> to ON).</li>
+                <li>Tap <b>Download APK</b> above to fetch the package.</li>
+                <li>When the download finishes, tap the notification or open <b>Files &gt; Downloads</b>.</li>
+                <li>Tap <b>Install</b> (if prompted, toggle <i>Allow from this source</i> to ON).</li>
             </ol>
         </div>
 
@@ -177,5 +443,100 @@
             AKASH SOCIAL NAGOD • Developer: Akash (Nagod, Satna, MP)
         </div>
     </div>
+
+    <!-- Interactive Script: Theme Toggle Switch & Download Progress Bar / Spinner Animation -->
+    <script>
+        // 1. Theme Toggle Switch Implementation
+        const htmlElement = document.documentElement;
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+
+        // Check stored theme preference or default to dark
+        const savedTheme = localStorage.getItem('akash_social_theme') || 'dark';
+        htmlElement.setAttribute('data-theme', savedTheme);
+
+        themeToggleBtn.addEventListener('click', function() {
+            const currentTheme = htmlElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            htmlElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('akash_social_theme', newTheme);
+        });
+
+        // 2. Download Progress Bar & Spinner Animation Implementation
+        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadSpinner = document.getElementById('downloadSpinner');
+        const downloadBtnIcon = document.getElementById('downloadBtnIcon');
+        const downloadBtnText = document.getElementById('downloadBtnText');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const progressPercentage = document.getElementById('progressPercentage');
+        const progressPhaseText = document.getElementById('progressPhaseText');
+        const progressStatusSubtext = document.getElementById('progressStatusSubtext');
+
+        let isDownloading = false;
+
+        downloadBtn.addEventListener('click', function() {
+            if (isDownloading) return;
+            isDownloading = true;
+
+            // UI: Show active spinner animation and processing state
+            downloadBtn.disabled = true;
+            downloadSpinner.style.display = 'inline-block';
+            downloadBtnIcon.style.display = 'none';
+            downloadBtnText.innerText = 'Preparing APK Package...';
+
+            progressContainer.style.display = 'block';
+            progressBarFill.style.width = '0%';
+            progressPercentage.innerText = '0%';
+
+            // Simulated progress stages representing network fetch & package preparation
+            let progress = 0;
+            const stages = [
+                { threshold: 25, phase: 'Connecting to Nagod release mirror...', sub: 'Locating AKASH_SOCIAL_NAGOD.apk (24.2 MB)' },
+                { threshold: 55, phase: 'Fetching APK package chunks...', sub: 'Streaming signed release binaries...' },
+                { threshold: 85, phase: 'Verifying package checksum...', sub: 'Validating SHA-256 certificate & permissions' },
+                { threshold: 100, phase: 'Download ready!', sub: 'Initiating browser download...' }
+            ];
+
+            const interval = setInterval(function() {
+                progress += Math.floor(Math.random() * 8) + 5;
+                if (progress > 100) progress = 100;
+
+                progressBarFill.style.width = progress + '%';
+                progressPercentage.innerText = progress + '%';
+
+                for (let i = 0; i < stages.length; i++) {
+                    if (progress <= stages[i].threshold || i === stages.length - 1) {
+                        progressPhaseText.innerText = stages[i].phase;
+                        progressStatusSubtext.innerText = stages[i].sub;
+                        break;
+                    }
+                }
+
+                if (progress >= 100) {
+                    clearInterval(interval);
+
+                    // Trigger direct file download
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = '/AKASH_SOCIAL_NAGOD.apk';
+                    downloadLink.download = 'AKASH_SOCIAL_NAGOD.apk';
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+
+                    // Update UI to complete state
+                    setTimeout(function() {
+                        downloadSpinner.style.display = 'none';
+                        downloadBtnIcon.style.display = 'inline';
+                        downloadBtnIcon.innerText = '✓';
+                        downloadBtnText.innerText = 'APK Download Started!';
+                        downloadBtn.disabled = false;
+                        isDownloading = false;
+
+                        progressStatusSubtext.innerText = 'File saved to Downloads. Tap again if download did not begin.';
+                    }, 500);
+                }
+            }, 100);
+        });
+    </script>
 </body>
 </html>

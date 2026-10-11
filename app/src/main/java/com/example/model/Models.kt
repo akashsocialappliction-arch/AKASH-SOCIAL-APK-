@@ -43,10 +43,18 @@ data class User(
     val doubleStreakTokensCount: Int = 0,
     val streakRestoreTokensCount: Int = 0,
     val isDoubleStreakBonusActiveToday: Boolean = false,
-    val lastStreakActivityDate: String = ""
+    val lastStreakActivityDate: String = "",
+    val selectedCategories: List<String> = emptyList(),
+    val isGuest: Boolean = false,
+    val authProvider: String = "local",
+    val phoneNumber: String? = null,
+    val email: String? = null
 ) {
     val isFriend: Boolean
         get() = isCurrentUserFan && isFanOfCurrentUser
+
+    val displayUsername: String
+        get() = username.removePrefix("@")
 }
 
 data class DraftPost(
@@ -236,12 +244,17 @@ enum class NotifType {
     FAN_GAINED,
     FRIEND_CONNECTED,
     REACH_MILESTONE,
+    STORY_MILESTONE,
+    REEL_MILESTONE,
     STREAK_MILESTONE,
     VIP_STAR,
     LIKE,
     COMMENT,
     CALL_MISSED,
-    LIVE_STARTED
+    LIVE_STARTED,
+    DIRECT_MESSAGE,
+    TASK_REWARD,
+    SECURITY_ALERT
 }
 
 data class NotificationItem(
@@ -252,7 +265,9 @@ data class NotificationItem(
     val timestampText: String,
     val actorUser: User? = null,
     val postId: String? = null,
-    val isRead: Boolean = false
+    val isRead: Boolean = false,
+    val recipientUserId: String = "",
+    val threshold: Int = 0
 )
 
 data class AdminUpdateItem(

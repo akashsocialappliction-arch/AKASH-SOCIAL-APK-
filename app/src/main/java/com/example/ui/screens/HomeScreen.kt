@@ -56,6 +56,7 @@ fun HomeScreen(
     onDirectMessagePost: (String, String) -> Unit = { _, _ -> },
     onShareApp: () -> Unit = {},
     onNavigateToCreate: () -> Unit = {},
+    isLoading: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var activeCommentPostId by remember { mutableStateOf<String?>(null) }
@@ -66,12 +67,15 @@ fun HomeScreen(
     val activeCommentPost = posts.find { it.id == activeCommentPostId }
 
     Box(modifier = modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("home_feed_list"),
-            contentPadding = PaddingValues(vertical = 8.dp)
-        ) {
+        if (isLoading) {
+            FeedSkeletonLoading()
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("home_feed_list"),
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) {
             // Horizontal Creator Story / StarClips bar
             item {
                 CreatorStoryBar(
@@ -143,6 +147,7 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    }
 
         // Interactive Share Media Bottom Sheet (Direct DM Share + System Share)
         if (activeSharePost != null) {

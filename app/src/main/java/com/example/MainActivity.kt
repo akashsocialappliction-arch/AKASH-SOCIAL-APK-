@@ -59,6 +59,11 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
     val isModeratorAuthenticated by viewModel.isModeratorAuthenticated.collectAsStateWithLifecycle()
     val spotlights by viewModel.spotlights.collectAsStateWithLifecycle()
 
+    // Shimmer Loading & Multi-Account States
+    val isFeedLoading by viewModel.isFeedLoading.collectAsStateWithLifecycle()
+    val isProfileLoading by viewModel.isProfileLoading.collectAsStateWithLifecycle()
+    val savedAccounts by viewModel.savedAccounts.collectAsStateWithLifecycle()
+
     // Secondary screen states
     val viewingCreatorId by viewModel.viewingCreatorId.collectAsStateWithLifecycle()
     val activeChatUserId by viewModel.activeChatUserId.collectAsStateWithLifecycle()
@@ -293,6 +298,12 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
                         user = targetUser,
                         isCurrentUser = targetUser.id == currentUser.id,
                         userPosts = authorPosts,
+                        savedAccounts = savedAccounts,
+                        onSwitchAccount = { userId -> viewModel.switchAccount(userId) },
+                        onCreateNewAccount = { name, username, bio, isCreator ->
+                            viewModel.createNewAccount(name, username, bio, isCreator)
+                        },
+                        isLoading = isProfileLoading,
                         onToggleFan = { userId -> viewModel.toggleFan(userId) },
                         onStartCall = { user, type -> viewModel.startCall(user, type) },
                         onOpenChat = { userId -> viewModel.openChatWith(userId) },
@@ -317,6 +328,7 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
                                 creators = creators,
                                 posts = posts,
                                 spotlights = spotlights,
+                                isLoading = isFeedLoading,
                                 onToggleFan = { userId -> viewModel.toggleFan(userId) },
                                 onToggleLike = { postId -> viewModel.toggleLikePost(postId) },
                                 onToggleSave = { postId -> viewModel.toggleSavePost(postId) },
@@ -391,6 +403,12 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
                                 user = currentUser,
                                 isCurrentUser = true,
                                 userPosts = myPosts,
+                                savedAccounts = savedAccounts,
+                                onSwitchAccount = { userId -> viewModel.switchAccount(userId) },
+                                onCreateNewAccount = { name, username, bio, isCreator ->
+                                    viewModel.createNewAccount(name, username, bio, isCreator)
+                                },
+                                isLoading = isProfileLoading,
                                 onToggleFan = {},
                                 onStartCall = { _, _ -> },
                                 onOpenChat = {},

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.StarPulseRepository
 import com.example.model.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +22,30 @@ enum class MainTab {
 class StarPulseViewModel(
     val repository: StarPulseRepository = StarPulseRepository()
 ) : ViewModel() {
+
+    // Shimmer / Skeleton Loading States for Feed and Profile
+    private val _isFeedLoading = MutableStateFlow(true)
+    val isFeedLoading: StateFlow<Boolean> = _isFeedLoading.asStateFlow()
+
+    private val _isProfileLoading = MutableStateFlow(false)
+    val isProfileLoading: StateFlow<Boolean> = _isProfileLoading.asStateFlow()
+
+    // Multiple Accounts Management on this device
+    val savedAccounts: StateFlow<List<User>> = repository.savedAccounts
+
+    private val _isAccountSwitcherOpen = MutableStateFlow(false)
+    val isAccountSwitcherOpen: StateFlow<Boolean> = _isAccountSwitcherOpen.asStateFlow()
+
+    private val _isCreateAccountOpen = MutableStateFlow(false)
+    val isCreateAccountOpen: StateFlow<Boolean> = _isCreateAccountOpen.asStateFlow()
+
+    init {
+        // Initial simulated network fetch with smooth perceived skeleton shimmer
+        viewModelScope.launch {
+            delay(650)
+            _isFeedLoading.value = false
+        }
+    }
 
     // Main navigation tab
     private val _currentTab = MutableStateFlow(MainTab.HOME)
@@ -57,6 +82,17 @@ class StarPulseViewModel(
     // Safety and Reporting
     private val _reportingTarget = MutableStateFlow<Pair<String, String>?>(null) // (Type: "USER" or "POST", id)
     val reportingTarget: StateFlow<Pair<String, String>?> = _reportingTarget.asStateFlow()
+
+    // Onboarding & Flow Control (Requirement 3, 5, 6)
+    private val _isOnboardingActive = MutableStateFlow(!repository.hasCompletedOnboarding())
+    val isOnboardingActive: StateFlow<Boolean> = _isOnboardingActive.asStateFlow()
+
+    private val _isViewingCategories = MutableStateFlow(false)
+    val isViewingCategories: StateFlow<Boolean> = _isViewingCategories.asStateFlow()
+
+    // Home feed view mode: Social Feed vs Vertical Reels
+    private val _isReelsMode = MutableStateFlow(false)
+    val isReelsMode: StateFlow<Boolean> = _isReelsMode.asStateFlow()
 
     // --- Feature 1: Music & Audio Library ---
     val musicRepository = com.example.data.MusicAudioRepository()
@@ -347,6 +383,115 @@ class StarPulseViewModel(
                 timestampText = "Just now"
             )
             _aiChatMessages.value = _aiChatMessages.value + aiMsg
+        }
+    }
+
+    // --- Onboarding & Auth Actions (Requirement 3, 5, 6) ---
+
+    fun completeOnboarding() {
+        repository.setOnboardingCompleted(true)
+        _isOnboardingActive.value = false
+    }
+
+    fun loginWithGoogle(accountName: String?, email: String?) {
+        repository.loginWithGoogle(accountName, email)
+    }
+
+    fun loginWithPhone(phoneNumber: String, otp: String) {
+        repository.loginWithPhone(phoneNumber, otp)
+    }
+
+    fun loginWithFacebook(accountName: String?) {
+        repository.loginWithFacebook(accountName)
+    }
+
+    fun exploreAsGuest(customUsername: String? = null, customName: String? = null) {
+        repository.exploreAsGuest(customUsername, customName)
+    }
+
+    fun linkGuestAccount(provider: String, identifier: String) {
+        repository.linkGuestAccount(provider, identifier)
+    }
+
+    fun openCategoriesScreen() {
+        _isViewingCategories.value = true
+    }
+
+    fun closeCategoriesScreen() {
+        _isViewingCategories.value = false
+    }
+
+    fun saveCategories(categories: List<String>) {
+        repository.updateUserCategories(categories)
+        _isViewingCategories.value = false
+    }
+
+    fun setReelsMode(isReels: Boolean) {
+        _isReelsMode.value = isReels
+    }
+
+    // Activity tracking & milestone checks (Requirements 8, 9, 10)
+    fun recordContentView(postId: String) {
+        repository.recordContentView(postId)
+    }
+
+    fun markNotificationAsRead(notifId: String) {
+        repository.markNotificationAsRead(notifId)
+    }
+
+    fun markAllNotificationsRead() {
+        repository.markAllNotificationsRead()
+    }
+
+    // --- Account Switching & Creation ---
+    fun openAccountSwitcher() {
+        _isAccountSwitcherOpen.value = true
+    }
+
+    fun closeAccountSwitcher() {
+        _isAccountSwitcherOpen.value = false
+    }
+
+    fun openCreateAccount() {
+        _isCreateAccountOpen.value = true
+    }
+
+    fun closeCreateAccount() {
+        _isCreateAccountOpen.value = false
+    }
+
+    fun switchAccount(userId: String) {
+        viewModelScope.launch {
+            _isProfileLoading.value = true
+            repository.switchAccount(userId)
+            delay(500)
+            _isProfileLoading.value = false
+        }
+    }
+
+    fun createNewAccount(name: String, username: String, bio: String, isCreator: Boolean) {
+        viewModelScope.launch {
+            _isProfileLoading.value = true
+            repository.createAccount(name, username, bio, isCreator)
+            delay(500)
+            _isProfileLoading.value = false
+        }
+    }
+
+    // --- Shimmer Refresh Triggers ---
+    fun refreshFeed() {
+        viewModelScope.launch {
+            _isFeedLoading.value = true
+            delay(750)
+            _isFeedLoading.value = false
+        }
+    }
+
+    fun refreshProfile() {
+        viewModelScope.launch {
+            _isProfileLoading.value = true
+            delay(600)
+            _isProfileLoading.value = false
         }
     }
 }

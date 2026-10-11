@@ -23,6 +23,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -56,7 +58,11 @@ fun AppDownloadCard(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val coroutineScope = rememberCoroutineScope()
     var copiedToClipboard by remember { mutableStateOf(false) }
+    var isDownloading by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableFloatStateOf(0f) }
+    var downloadPhaseText by remember { mutableStateOf("") }
     var downloadSimulated by remember { mutableStateOf(false) }
 
     Surface(
@@ -246,12 +252,35 @@ fun AppDownloadCard(
                     )
                 }
 
-                // Download Direct Action Button
+                // Download Direct Action Button with Spinner Animation
                 FilledTonalButton(
                     onClick = {
-                        downloadSimulated = true
-                        Toast.makeText(context, "Downloading AKASH SOCIAL NAGOD APK v1.0.0...", Toast.LENGTH_LONG).show()
+                        if (!isDownloading) {
+                            isDownloading = true
+                            downloadSimulated = false
+                            downloadProgress = 0f
+                            downloadPhaseText = "Connecting to release server..."
+                            coroutineScope.launch {
+                                val steps = listOf(
+                                    0.25f to "Connecting to Nagod release mirror...",
+                                    0.55f to "Fetching AKASH_SOCIAL_NAGOD.apk (24.2 MB)...",
+                                    0.80f to "Verifying SHA-256 certificate & permissions...",
+                                    0.95f to "Finalizing installation package...",
+                                    1.00f to "Download complete!"
+                                )
+                                for ((prog, phase) in steps) {
+                                    kotlinx.coroutines.delay(260)
+                                    downloadProgress = prog
+                                    downloadPhaseText = phase
+                                }
+                                kotlinx.coroutines.delay(180)
+                                isDownloading = false
+                                downloadSimulated = true
+                                Toast.makeText(context, "AKASH SOCIAL NAGOD APK v1.0.0 is ready for install!", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     },
+                    enabled = !isDownloading,
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = ReachCyan.copy(alpha = 0.25f),
@@ -261,17 +290,69 @@ fun AppDownloadCard(
                         .weight(1.1f)
                         .testTag("download_card_download_button")
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Download,
-                        contentDescription = "Download APK",
-                        tint = ReachCyanGlow,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (downloadSimulated) "Ready" else "Download",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                    if (isDownloading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = ReachCyanGlow
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "${(downloadProgress * 100).toInt()}%",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    } else {
+                        Icon(
+                            imageVector = if (downloadSimulated) Icons.Filled.CheckCircle else Icons.Filled.Download,
+                            contentDescription = "Download APK",
+                            tint = ReachCyanGlow,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (downloadSimulated) "Ready" else "Download",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Visual Progress Bar & Phase Status Animation
+            AnimatedVisibility(visible = isDownloading) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = downloadPhaseText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = ReachCyanGlow
+                        )
+                        Text(
+                            text = "${(downloadProgress * 100).toInt()}%",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(5.dp))
+                    LinearProgressIndicator(
+                        progress = { downloadProgress },
+                        color = ReachCyanGlow,
+                        trackColor = ReachCyan.copy(alpha = 0.2f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
                     )
                 }
             }

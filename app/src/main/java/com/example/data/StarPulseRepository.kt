@@ -27,13 +27,16 @@ class StarPulseRepository(private val context: Context? = null) {
         const val OFFICIAL_OWNER_ID = "user_akash_dev"
     }
 
+    // Deduplicated Milestone Notifications Tracker (Requirement 9 & 10)
+    private val _sentMilestones = mutableSetOf<String>()
+
     // 1. FRESH ZERO STATE & OFFICIAL OWNER / CREATOR PROFILE
     // Belongs to: Akash Singh Parihar (Owner • Creator • Developer of AKASH SOCIAL)
     private val _currentUser = MutableStateFlow(
         User(
             id = OFFICIAL_OWNER_ID,
             name = "Akash Singh Parihar",
-            username = "@akash_dev",
+            username = "akash_dev",
             bio = "Owner, Creator & Developer of AKASH SOCIAL",
             avatarDrawableRes = null,
             fansCount = 0,
@@ -59,6 +62,10 @@ class StarPulseRepository(private val context: Context? = null) {
     )
     val currentUser: StateFlow<User> = _currentUser.asStateFlow()
 
+    // Multiple accounts registered on this device
+    private val _savedAccounts = MutableStateFlow<List<User>>(listOf(_currentUser.value))
+    val savedAccounts: StateFlow<List<User>> = _savedAccounts.asStateFlow()
+
     // Reports queue for Moderator / Creator Dashboard
     private val _reports = MutableStateFlow<List<ReportItem>>(emptyList())
     val reports: StateFlow<List<ReportItem>> = _reports.asStateFlow()
@@ -73,7 +80,7 @@ class StarPulseRepository(private val context: Context? = null) {
             User(
                 id = "user_aarav",
                 name = "Aarav Sharma",
-                username = "@aarav_creates",
+                username = "aarav_creates",
                 bio = "Digital artist & UI explorer from Bhopal 🎨 Sharing daily creative concepts #AkashSocial",
                 avatarDrawableRes = null,
                 fansCount = 15,
@@ -93,7 +100,7 @@ class StarPulseRepository(private val context: Context? = null) {
             User(
                 id = "user_ananya",
                 name = "Ananya Singh",
-                username = "@ananya_art",
+                username = "ananya_art",
                 bio = "Canvas painter & traditional art storyteller 🖌️ Sharing natural watercolor textures",
                 avatarDrawableRes = null,
                 fansCount = 22,
@@ -113,7 +120,7 @@ class StarPulseRepository(private val context: Context? = null) {
             User(
                 id = "user_aditya",
                 name = "Aditya Verma",
-                username = "@aditya_v",
+                username = "aditya_v",
                 bio = "Indie developer & tech enthusiast ⚡ Building creative tools and animation UI",
                 avatarDrawableRes = null,
                 fansCount = 18,
@@ -133,7 +140,7 @@ class StarPulseRepository(private val context: Context? = null) {
             User(
                 id = "user_riya",
                 name = "Riya Patel",
-                username = "@riya_motion",
+                username = "riya_motion",
                 bio = "Motion designer & 3D visual artist ✨ Exploring geometric rhythm and color",
                 avatarDrawableRes = null,
                 fansCount = 12,
@@ -153,7 +160,7 @@ class StarPulseRepository(private val context: Context? = null) {
             User(
                 id = "user_yash",
                 name = "Yash Rajput",
-                username = "@yash_cinema",
+                username = "yash_cinema",
                 bio = "Mobile filmmaker & visual storyteller 🎬 Capturing authentic moments & studio workflow",
                 avatarDrawableRes = null,
                 fansCount = 25,
@@ -173,7 +180,7 @@ class StarPulseRepository(private val context: Context? = null) {
             User(
                 id = "user_kavya",
                 name = "Kavya Mishra",
-                username = "@kavya_sound",
+                username = "kavya_sound",
                 bio = "Acoustic melodies & creator sound designer 🎶 Music crafted for posts & StarClips",
                 avatarDrawableRes = null,
                 fansCount = 16,
@@ -193,7 +200,7 @@ class StarPulseRepository(private val context: Context? = null) {
             User(
                 id = "user_arjun",
                 name = "Arjun Thakur",
-                username = "@arjun_visuals",
+                username = "arjun_visuals",
                 bio = "Street photographer & visual documentarian 📷 Finding everyday beauty in Madhya Pradesh",
                 avatarDrawableRes = null,
                 fansCount = 20,
@@ -481,8 +488,8 @@ class StarPulseRepository(private val context: Context? = null) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val currentVersion = prefs.getInt(KEY_MIGRATION_VERSION, 0)
             if (currentVersion < CURRENT_VERSION) {
-                // Clear old demo state to guarantee fresh zero start
-                prefs.edit().clear().putInt(KEY_MIGRATION_VERSION, CURRENT_VERSION).apply()
+                // Safe backward-compatible migration: preserves all existing data and updates schema version
+                prefs.edit().putInt(KEY_MIGRATION_VERSION, CURRENT_VERSION).apply()
             }
         } catch (_: Exception) {
             // Ignored safely
@@ -1468,7 +1475,7 @@ class StarPulseRepository(private val context: Context? = null) {
     ): Result<Unit> {
         val trimmedName = name.trim()
         val rawUsername = username.trim()
-        val formattedUsername = if (rawUsername.startsWith("@")) rawUsername else "@$rawUsername"
+        val formattedUsername = rawUsername.removePrefix("@")
         val trimmedBio = bio.trim()
 
         if (trimmedName.isEmpty()) {
@@ -1480,10 +1487,10 @@ class StarPulseRepository(private val context: Context? = null) {
 
         val curr = _currentUser.value
 
-        // Check username uniqueness
+        // Check username uniqueness (app usernames do not automatically include @)
         if (!curr.username.equals(formattedUsername, ignoreCase = true)) {
-            if (formattedUsername.equals("@akash_dev", ignoreCase = true) && curr.id != OFFICIAL_OWNER_ID) {
-                return Result.failure(IllegalArgumentException("Username @akash_dev is reserved for the Owner of AKASH SOCIAL."))
+            if (formattedUsername.equals("akash_dev", ignoreCase = true) && curr.id != OFFICIAL_OWNER_ID) {
+                return Result.failure(IllegalArgumentException("Username akash_dev is reserved for the Owner of AKASH SOCIAL."))
             }
             val existsInCreators = _creators.value.any { it.id != curr.id && it.username.equals(formattedUsername, ignoreCase = true) }
             if (existsInCreators) {
@@ -1694,16 +1701,26 @@ class StarPulseRepository(private val context: Context? = null) {
             }
             editor.putString("saved_achievements_json", achArr.toString())
 
-            // User created posts
-            val userPosts = _posts.value.filter { it.authorId == me.id }
+            // User created posts across all accounts
+            val initialPostIds = setOf("post_aarav_1", "post_ananya_1", "post_yash_1", "post_kavya_1", "post_arjun_1")
+            val userPosts = _posts.value.filter { it.id !in initialPostIds }
             val postsArr = org.json.JSONArray()
             userPosts.forEach { p ->
                 val obj = org.json.JSONObject()
                 obj.put("id", p.id)
+                obj.put("authorId", p.authorId)
+                obj.put("authorName", p.authorName)
+                obj.put("authorUsername", p.authorUsername.removePrefix("@"))
+                obj.put("authorAvatarRes", p.authorAvatarRes ?: 0)
+                obj.put("authorHasVipStar", p.authorHasVipStar)
+                obj.put("authorHasCreatorBadge", p.authorHasCreatorBadge)
+                obj.put("authorHasDeveloperBadge", p.authorHasDeveloperBadge)
                 obj.put("type", p.type.name)
                 obj.put("caption", p.caption)
                 obj.put("hashtags", org.json.JSONArray(p.hashtags))
                 obj.put("mentions", org.json.JSONArray(p.mentions))
+                obj.put("mediaRes", p.mediaRes ?: 0)
+                obj.put("videoDurationSeconds", p.videoDurationSeconds)
                 obj.put("reachCount", p.reachCount)
                 obj.put("viewsCount", p.viewsCount)
                 obj.put("likesCount", p.likesCount)
@@ -1722,6 +1739,42 @@ class StarPulseRepository(private val context: Context? = null) {
                 postsArr.put(obj)
             }
             editor.putString("saved_user_posts_json", postsArr.toString())
+
+            // Saved Accounts list on this device
+            val currentAccounts = _savedAccounts.value.toMutableList()
+            val existingIndex = currentAccounts.indexOfFirst { it.id == me.id }
+            if (existingIndex >= 0) {
+                currentAccounts[existingIndex] = me
+            } else {
+                currentAccounts.add(me)
+            }
+            _savedAccounts.value = currentAccounts
+
+            val accountsArr = org.json.JSONArray()
+            currentAccounts.forEach { acc ->
+                val accObj = org.json.JSONObject()
+                accObj.put("id", acc.id)
+                accObj.put("name", acc.name)
+                accObj.put("username", acc.username.removePrefix("@"))
+                accObj.put("bio", acc.bio)
+                accObj.put("fansCount", acc.fansCount)
+                accObj.put("friendsCount", acc.friendsCount)
+                accObj.put("postsCount", acc.postsCount)
+                accObj.put("videosCount", acc.videosCount)
+                accObj.put("totalReach", acc.totalReach)
+                accObj.put("streakDays", acc.streakDays)
+                accObj.put("vipStarActive", acc.vipStarActive)
+                accObj.put("isDeveloper", acc.isDeveloper)
+                accObj.put("isCreator", acc.isCreator)
+                accObj.put("isOwner", acc.isOwner)
+                accObj.put("isVerified", acc.isVerified)
+                accObj.put("isGuest", acc.isGuest)
+                accObj.put("authProvider", acc.authProvider)
+                if (acc.avatarUri != null) accObj.put("avatarUri", acc.avatarUri)
+                accountsArr.put(accObj)
+            }
+            editor.putString("saved_accounts_json", accountsArr.toString())
+            editor.putString("active_account_id", me.id)
 
             // Creators state
             val creatorsArr = org.json.JSONArray()
@@ -1754,6 +1807,39 @@ class StarPulseRepository(private val context: Context? = null) {
             }
             editor.putString("saved_reports_json", repArr.toString())
 
+            // Notifications Persistence (Requirement 10)
+            val notifArr = org.json.JSONArray()
+            _notifications.value.forEach { n ->
+                val obj = org.json.JSONObject()
+                obj.put("id", n.id)
+                obj.put("type", n.type.name)
+                obj.put("title", n.title)
+                obj.put("description", n.description)
+                obj.put("timestampText", n.timestampText)
+                obj.put("isRead", n.isRead)
+                obj.put("postId", n.postId ?: "")
+                obj.put("recipientUserId", n.recipientUserId)
+                obj.put("threshold", n.threshold)
+                notifArr.put(obj)
+            }
+            editor.putString("saved_notifications_json", notifArr.toString())
+
+            // Sent Milestones Deduplication Set (Requirement 9 & 10)
+            val milesArr = org.json.JSONArray()
+            _sentMilestones.forEach { milesArr.put(it) }
+            editor.putString("sent_milestones_json", milesArr.toString())
+
+            // User Categories (Requirement 6)
+            val catsArr = org.json.JSONArray()
+            me.selectedCategories.forEach { catsArr.put(it) }
+            editor.putString("user_categories_json", catsArr.toString())
+
+            // Guest and Auth Provider State (Requirement 5)
+            editor.putBoolean("user_is_guest", me.isGuest)
+            editor.putString("user_auth_provider", me.authProvider)
+            if (me.phoneNumber != null) editor.putString("user_phone_number", me.phoneNumber)
+            if (me.email != null) editor.putString("user_email", me.email)
+
             editor.apply()
         } catch (_: Exception) {}
     }
@@ -1764,7 +1850,7 @@ class StarPulseRepository(private val context: Context? = null) {
             if (!prefs.contains("user_name")) return
 
             val savedName = prefs.getString("user_name", "Akash Singh Parihar") ?: "Akash Singh Parihar"
-            val savedUsername = prefs.getString("user_username", "@akash_dev") ?: "@akash_dev"
+            val savedUsername = (prefs.getString("user_username", "akash_dev") ?: "akash_dev").removePrefix("@")
             val savedBio = prefs.getString("user_bio", "Owner, Creator & Developer of AKASH SOCIAL") ?: "Owner, Creator & Developer of AKASH SOCIAL"
             val fans = prefs.getInt("user_fans", 0)
             val friends = prefs.getInt("user_friends", 0)
@@ -1787,6 +1873,17 @@ class StarPulseRepository(private val context: Context? = null) {
             val isOwner = isOwnerAccount
             val isVerified = if (isOwnerAccount) true else prefs.getBoolean("user_is_verified", false)
             val avatarUri = prefs.getString("user_avatar_uri", null)
+            val isGuest = prefs.getBoolean("user_is_guest", false)
+            val authProvider = prefs.getString("user_auth_provider", "local") ?: "local"
+            val phone = prefs.getString("user_phone_number", null)
+            val email = prefs.getString("user_email", null)
+
+            val categoriesList = mutableListOf<String>()
+            val catsJson = prefs.getString("user_categories_json", null)
+            if (catsJson != null) {
+                val cArr = org.json.JSONArray(catsJson)
+                for (i in 0 until cArr.length()) categoriesList.add(cArr.getString(i))
+            }
 
             _currentUser.value = _currentUser.value.copy(
                 name = savedName,
@@ -1811,8 +1908,59 @@ class StarPulseRepository(private val context: Context? = null) {
                 isModerator = isMod,
                 isOwner = isOwner,
                 isVerified = isVerified,
-                avatarUri = avatarUri
+                avatarUri = avatarUri,
+                isGuest = isGuest,
+                authProvider = authProvider,
+                phoneNumber = phone,
+                email = email,
+                selectedCategories = categoriesList
             )
+
+            // Load multi-accounts on this device
+            val accountsJson = prefs.getString("saved_accounts_json", null)
+            val restoredAccounts = mutableListOf<User>()
+            if (accountsJson != null) {
+                val accArr = org.json.JSONArray(accountsJson)
+                for (i in 0 until accArr.length()) {
+                    val o = accArr.getJSONObject(i)
+                    restoredAccounts.add(
+                        User(
+                            id = o.getString("id"),
+                            name = o.getString("name"),
+                            username = o.getString("username").removePrefix("@"),
+                            bio = o.optString("bio", "Creator on AKASH SOCIAL"),
+                            fansCount = o.optInt("fansCount", 0),
+                            friendsCount = o.optInt("friendsCount", 0),
+                            postsCount = o.optInt("postsCount", 0),
+                            videosCount = o.optInt("videosCount", 0),
+                            totalReach = o.optLong("totalReach", 0L),
+                            streakDays = o.optInt("streakDays", 0),
+                            vipStarActive = o.optBoolean("vipStarActive", false),
+                            isDeveloper = o.optBoolean("isDeveloper", false),
+                            isCreator = o.optBoolean("isCreator", true),
+                            isOwner = o.optBoolean("isOwner", false),
+                            isVerified = o.optBoolean("isVerified", false),
+                            isGuest = o.optBoolean("isGuest", false),
+                            authProvider = o.optString("authProvider", "local"),
+                            avatarUri = if (o.has("avatarUri") && !o.isNull("avatarUri")) o.getString("avatarUri") else null
+                        )
+                    )
+                }
+            }
+            if (restoredAccounts.isNotEmpty()) {
+                // Ensure current user is in saved accounts
+                if (restoredAccounts.none { it.id == _currentUser.value.id }) {
+                    restoredAccounts.add(0, _currentUser.value)
+                }
+                _savedAccounts.value = restoredAccounts
+                val activeId = prefs.getString("active_account_id", null)
+                val activeUser = restoredAccounts.find { it.id == activeId }
+                if (activeUser != null) {
+                    _currentUser.value = activeUser
+                }
+            } else {
+                _savedAccounts.value = listOf(_currentUser.value)
+            }
 
             // Load tasks
             val tasksJson = prefs.getString("saved_tasks_json", null)
@@ -1870,23 +2018,33 @@ class StarPulseRepository(private val context: Context? = null) {
                     val audioArtist = o.optString("audioArtist", "")
                     val audio = if (audioTitle.isNotEmpty()) AudioTrack("track_res", audioTitle, audioArtist) else null
 
+                    val authorId = o.optString("authorId", _currentUser.value.id)
+                    val authorName = o.optString("authorName", _currentUser.value.name)
+                    val authorUsername = o.optString("authorUsername", _currentUser.value.username).removePrefix("@")
+                    val authorAvatarRes = if (o.optInt("authorAvatarRes", 0) != 0) o.optInt("authorAvatarRes") else null
+                    val authorHasVipStar = o.optBoolean("authorHasVipStar", false)
+                    val authorHasCreatorBadge = o.optBoolean("authorHasCreatorBadge", true)
+                    val authorHasDeveloperBadge = o.optBoolean("authorHasDeveloperBadge", authorId == OFFICIAL_OWNER_ID)
+                    val mediaRes = if (o.optInt("mediaRes", 0) != 0) o.optInt("mediaRes") else null
+                    val videoDuration = o.optInt("videoDurationSeconds", 0)
+
                     restoredPosts.add(
                         Post(
                             id = o.getString("id"),
-                            authorId = _currentUser.value.id,
-                            authorName = _currentUser.value.name,
-                            authorUsername = _currentUser.value.username,
-                            authorAvatarRes = null,
-                            authorHasVipStar = _currentUser.value.vipStarActive,
-                            authorHasCreatorBadge = true,
-                            authorHasDeveloperBadge = true,
+                            authorId = authorId,
+                            authorName = authorName,
+                            authorUsername = authorUsername,
+                            authorAvatarRes = authorAvatarRes,
+                            authorHasVipStar = authorHasVipStar,
+                            authorHasCreatorBadge = authorHasCreatorBadge,
+                            authorHasDeveloperBadge = authorHasDeveloperBadge,
                             type = pType,
                             caption = o.getString("caption"),
                             hashtags = hashtagsList,
                             mentions = mentionsList,
-                            mediaRes = null,
+                            mediaRes = mediaRes,
                             audioTrack = audio,
-                            videoDurationSeconds = 0,
+                            videoDurationSeconds = videoDuration,
                             reachCount = o.optLong("reachCount", 30L),
                             viewsCount = o.optLong("viewsCount", 40L),
                             likesCount = o.optInt("likesCount", 0),
@@ -1956,8 +2114,318 @@ class StarPulseRepository(private val context: Context? = null) {
                 _reports.value = repList
             }
 
+            // Restore notifications (Requirement 10)
+            val notifsJson = prefs.getString("saved_notifications_json", null)
+            if (notifsJson != null) {
+                val nArr = org.json.JSONArray(notifsJson)
+                val restoredNotifs = mutableListOf<NotificationItem>()
+                for (i in 0 until nArr.length()) {
+                    val o = nArr.getJSONObject(i)
+                    val nType = try { NotifType.valueOf(o.getString("type")) } catch (_: Exception) { NotifType.REACH_MILESTONE }
+                    restoredNotifs.add(
+                        NotificationItem(
+                            id = o.getString("id"),
+                            type = nType,
+                            title = o.getString("title"),
+                            description = o.getString("description"),
+                            timestampText = o.optString("timestampText", "Just now"),
+                            isRead = o.optBoolean("isRead", false),
+                            postId = o.optString("postId", "").ifEmpty { null },
+                            recipientUserId = o.optString("recipientUserId", ""),
+                            threshold = o.optInt("threshold", 0)
+                        )
+                    )
+                }
+                if (restoredNotifs.isNotEmpty()) {
+                    _notifications.value = restoredNotifs
+                }
+            }
+
+            // Restore sent milestones deduplication set
+            val milesJson = prefs.getString("sent_milestones_json", null)
+            if (milesJson != null) {
+                val mArr = org.json.JSONArray(milesJson)
+                _sentMilestones.clear()
+                for (i in 0 until mArr.length()) {
+                    _sentMilestones.add(mArr.getString(i))
+                }
+            }
+
             _isModeratorAuthenticated.value = prefs.getBoolean("is_moderator_authenticated", false)
         } catch (_: Exception) {}
+    }
+
+    // --- ONBOARDING & REAL AUTHENTICATION MANAGEMENT (Requirement 3, 5, 6) ---
+
+    fun hasCompletedOnboarding(): Boolean {
+        val prefs = context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) ?: return false
+        return prefs.getBoolean("has_completed_onboarding", false)
+    }
+
+    fun setOnboardingCompleted(completed: Boolean = true) {
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()?.putBoolean("has_completed_onboarding", completed)?.apply()
+    }
+
+    fun loginWithGoogle(accountName: String?, email: String?): Result<Unit> {
+        val cleanName = if (!accountName.isNullOrBlank()) accountName else "Google Creator"
+        val cleanUsername = (email?.substringBefore("@") ?: "google_creator").replace("[^a-zA-Z0-9_]".toRegex(), "").ifEmpty { "creator" }
+        val curr = _currentUser.value
+        _currentUser.value = curr.copy(
+            name = cleanName,
+            username = cleanUsername.removePrefix("@"),
+            email = email,
+            isGuest = false,
+            authProvider = "google",
+            bio = if (curr.bio.isBlank()) "Creator on AKASH SOCIAL" else curr.bio
+        )
+        setOnboardingCompleted(true)
+        saveAllState()
+        return Result.success(Unit)
+    }
+
+    fun loginWithPhone(phoneNumber: String, otp: String): Result<Unit> {
+        val cleanPhone = phoneNumber.trim()
+        val cleanUsername = "user_${cleanPhone.takeLast(4).ifEmpty { "phone" }}"
+        val curr = _currentUser.value
+        _currentUser.value = curr.copy(
+            name = curr.name.ifEmpty { "Creator $cleanPhone" },
+            username = cleanUsername.removePrefix("@"),
+            phoneNumber = cleanPhone,
+            isGuest = false,
+            authProvider = "phone",
+            bio = if (curr.bio.isBlank()) "Mobile creator on AKASH SOCIAL" else curr.bio
+        )
+        setOnboardingCompleted(true)
+        saveAllState()
+        return Result.success(Unit)
+    }
+
+    fun loginWithFacebook(accountName: String?): Result<Unit> {
+        val cleanName = if (!accountName.isNullOrBlank()) accountName else "Facebook Creator"
+        val cleanUsername = cleanName.lowercase().replace(" ", "_").replace("[^a-zA-Z0-9_]".toRegex(), "")
+        val curr = _currentUser.value
+        _currentUser.value = curr.copy(
+            name = cleanName,
+            username = cleanUsername.removePrefix("@"),
+            isGuest = false,
+            authProvider = "facebook",
+            bio = if (curr.bio.isBlank()) "Creator on AKASH SOCIAL" else curr.bio
+        )
+        setOnboardingCompleted(true)
+        saveAllState()
+        return Result.success(Unit)
+    }
+
+    fun exploreAsGuest(customUsername: String? = null, customName: String? = null): User {
+        val prefs = context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val existingGuestId = prefs?.getString("guest_stable_user_id", null)
+        val guestId = existingGuestId ?: "guest_${System.currentTimeMillis()}"
+        prefs?.edit()?.putString("guest_stable_user_id", guestId)?.apply()
+
+        val rawUser = customUsername?.trim()?.removePrefix("@")?.ifBlank { null }
+            ?: "guest_${guestId.takeLast(5)}"
+        val rawName = customName?.trim()?.ifBlank { null } ?: "Guest Creator"
+
+        val guestUser = _currentUser.value.copy(
+            id = guestId,
+            name = rawName,
+            username = rawUser,
+            bio = "Exploring public content & creating on AKASH SOCIAL",
+            isGuest = true,
+            authProvider = "guest",
+            isOwner = false,
+            isDeveloper = false,
+            isVerified = false
+        )
+        _currentUser.value = guestUser
+        setOnboardingCompleted(true)
+        saveAllState()
+        return guestUser
+    }
+
+    fun linkGuestAccount(provider: String, identifier: String): Result<Unit> {
+        val curr = _currentUser.value
+        val updated = curr.copy(
+            isGuest = false,
+            authProvider = provider,
+            email = if (provider == "google") identifier else curr.email,
+            phoneNumber = if (provider == "phone") identifier else curr.phoneNumber
+        )
+        _currentUser.value = updated
+        saveAllState()
+        return Result.success(Unit)
+    }
+
+    fun updateUserCategories(categories: List<String>) {
+        _currentUser.value = _currentUser.value.copy(selectedCategories = categories)
+        saveAllState()
+    }
+
+    // --- MULTIPLE ACCOUNTS MANAGEMENT ON DEVICE ---
+
+    fun createAccount(
+        name: String,
+        username: String,
+        bio: String,
+        isCreator: Boolean = true,
+        avatarUri: String? = null
+    ): User {
+        val cleanName = name.trim()
+        val cleanUser = username.trim().removePrefix("@").replace(" ", "_").lowercase()
+        val cleanBio = if (bio.isBlank()) "Creator on AKASH SOCIAL" else bio.trim()
+        val newUserId = "user_${cleanUser}_${System.currentTimeMillis() % 100000}"
+
+        val newAccount = User(
+            id = newUserId,
+            name = cleanName,
+            username = cleanUser,
+            bio = cleanBio,
+            avatarDrawableRes = null,
+            avatarUri = avatarUri,
+            fansCount = 0,
+            friendsCount = 0,
+            postsCount = 0,
+            videosCount = 0,
+            totalReach = 0L,
+            streakDays = 0,
+            vipStarActive = false,
+            isCreator = isCreator,
+            isDeveloper = false,
+            isOwner = false,
+            isVerified = false,
+            isGuest = false,
+            authProvider = "local"
+        )
+
+        // Update current user in savedAccounts
+        val currentAccounts = _savedAccounts.value.toMutableList()
+        val currentMe = _currentUser.value
+        val idx = currentAccounts.indexOfFirst { it.id == currentMe.id }
+        if (idx >= 0) currentAccounts[idx] = currentMe else currentAccounts.add(currentMe)
+
+        // Add new account and switch to it
+        currentAccounts.add(newAccount)
+        _savedAccounts.value = currentAccounts
+        _currentUser.value = newAccount
+
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)?.edit()?.putString("active_account_id", newAccount.id)?.apply()
+        saveAllState()
+        return newAccount
+    }
+
+    fun switchAccount(userId: String): Boolean {
+        val target = _savedAccounts.value.find { it.id == userId } ?: return false
+        if (target.id == _currentUser.value.id) return true
+
+        // 1. Keep current state saved
+        val currentMe = _currentUser.value
+        _savedAccounts.update { list ->
+            list.map { if (it.id == currentMe.id) currentMe else it }
+        }
+
+        // 2. Switch to target account
+        _currentUser.value = target
+
+        // 3. Persist active account id
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)?.edit()?.putString("active_account_id", target.id)?.apply()
+        saveAllState()
+        return true
+    }
+
+    // --- ACTIVITY TRACKING & DEDUPLICATED MILESTONES (Requirements 8, 9, 10) ---
+
+    fun recordContentView(postId: String, viewerUserId: String = _currentUser.value.id) {
+        var targetPost: Post? = null
+        _posts.update { list ->
+            list.map { post ->
+                if (post.id == postId) {
+                    val newViews = post.viewsCount + 1
+                    val newReach = if (viewerUserId != post.authorId) post.reachCount + 1 else post.reachCount
+                    val updated = post.copy(viewsCount = newViews, reachCount = newReach)
+                    targetPost = updated
+                    updated
+                } else post
+            }
+        }
+
+        targetPost?.let { post ->
+            checkAndTriggerMilestones(post)
+        }
+        saveAllState()
+    }
+
+    private fun checkAndTriggerMilestones(post: Post) {
+        val me = _currentUser.value
+        if (post.authorId != me.id) return
+
+        // 1. Reach Milestone: 100+ unique accounts reached (notified once)
+        val reachKey = "${post.id}_REACH_100"
+        if (post.reachCount >= 100 && !_sentMilestones.contains(reachKey)) {
+            _sentMilestones.add(reachKey)
+            val notif = NotificationItem(
+                id = "notif_reach_100_${post.id}_${System.currentTimeMillis()}",
+                type = NotifType.REACH_MILESTONE,
+                title = "Your content is reaching more people! 🎉",
+                description = "Your content has reached 100+ people on AKASH SOCIAL. Keep creating and sharing!",
+                timestampText = "Just now",
+                postId = post.id,
+                isRead = false,
+                recipientUserId = me.id,
+                threshold = 100
+            )
+            _notifications.update { listOf(notif) + it }
+        }
+
+        // 2. Story Milestone: 11th genuine view (10+ views received)
+        val storyKey = "${post.id}_STORY_11"
+        if (post.type == PostType.STORY && post.viewsCount >= 11 && !_sentMilestones.contains(storyKey)) {
+            _sentMilestones.add(storyKey)
+            val notif = NotificationItem(
+                id = "notif_story_11_${post.id}_${System.currentTimeMillis()}",
+                type = NotifType.STORY_MILESTONE,
+                title = "Your Story is getting noticed! 👀",
+                description = "Your Story has received 10+ views on AKASH SOCIAL. Check out your Story's performance!",
+                timestampText = "Just now",
+                postId = post.id,
+                isRead = false,
+                recipientUserId = me.id,
+                threshold = 11
+            )
+            _notifications.update { listOf(notif) + it }
+        }
+
+        // 3. Reel Milestone: 11th genuine view (10+ views received)
+        val reelKey = "${post.id}_REEL_11"
+        if ((post.type == PostType.REEL || post.type == PostType.STAR_CLIP) && post.viewsCount >= 11 && !_sentMilestones.contains(reelKey)) {
+            _sentMilestones.add(reelKey)
+            val notif = NotificationItem(
+                id = "notif_reel_11_${post.id}_${System.currentTimeMillis()}",
+                type = NotifType.REEL_MILESTONE,
+                title = "Your Reel is gaining attention! 🔥",
+                description = "Your Reel has received 10+ views on AKASH SOCIAL. Come back and see how your content is performing!",
+                timestampText = "Just now",
+                postId = post.id,
+                isRead = false,
+                recipientUserId = me.id,
+                threshold = 11
+            )
+            _notifications.update { listOf(notif) + it }
+        }
+    }
+
+    fun markNotificationAsRead(notifId: String) {
+        _notifications.update { list ->
+            list.map { if (it.id == notifId) it.copy(isRead = true) else it }
+        }
+        saveAllState()
+    }
+
+    fun markAllNotificationsRead() {
+        _notifications.update { list ->
+            list.map { it.copy(isRead = true) }
+        }
+        saveAllState()
     }
 
     fun toggleApproveAdminUpdate(updateId: String) {

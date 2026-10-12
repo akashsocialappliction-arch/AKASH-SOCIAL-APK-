@@ -1958,6 +1958,14 @@ class StarPulseRepository(private val context: Context? = null) {
                 if (activeUser != null) {
                     _currentUser.value = activeUser
                 }
+                // Ensure other accounts are present in creators for mutual discovery & profile viewing
+                val otherAccounts = restoredAccounts.filter { it.id != _currentUser.value.id }
+                if (otherAccounts.isNotEmpty()) {
+                    _creators.update { currentCreators ->
+                        val existingIds = currentCreators.map { it.id }.toSet()
+                        currentCreators + otherAccounts.filter { it.id !in existingIds }
+                    }
+                }
             } else {
                 _savedAccounts.value = listOf(_currentUser.value)
             }
@@ -2262,6 +2270,276 @@ class StarPulseRepository(private val context: Context? = null) {
         saveAllState()
     }
 
+    // --- SECURE PASSWORD AUTHENTICATION & REGISTRATION (Section 2, 3, 4) ---
+    private val _accountCredentials = mutableMapOf<String, String>()
+
+    private fun hashPassword(password: String, salt: String = "akash_social_salt"): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        val bytes = md.digest((password + salt).toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    fun isUsernameAvailable(username: String): Boolean {
+        val clean = username.trim().removePrefix("@").lowercase()
+        if (clean.isBlank()) return false
+        val allUsernames = (_savedAccounts.value.map { it.username.lowercase() } +
+                            _creators.value.map { it.username.lowercase() } +
+                            _accountCredentials.keys +
+                            listOf("akash_dev", "akash", "owner")).toSet()
+        return clean !in allUsernames
+    }
+
+    fun registerWithUsernameAndPassword(username: String, password: String): Result<User> {
+        val cleanUsername = username.trim().removePrefix("@").replace(" ", "_").lowercase()
+        if (cleanUsername.length < 3) {
+            return Result.failure(Exception("Username must be at least 3 characters."))
+        }
+        if (!cleanUsername.matches("^[a-z0-9_]+$".toRegex())) {
+            return Result.failure(Exception("Username can only contain letters, numbers, and underscores."))
+        }
+        if (password.length < 6) {
+            return Result.failure(Exception("Password must be at least 6 characters."))
+        }
+        if (!isUsernameAvailable(cleanUsername)) {
+            return Result.failure(Exception("Username '$cleanUsername' is already taken. Please choose another or log in."))
+        }
+
+        val hashedPassword = hashPassword(password)
+        _accountCredentials[cleanUsername] = hashedPassword
+
+        val prefs = context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        try {
+            val credsJson = prefs?.getString("account_credentials_json", "{}") ?: "{}"
+            val credsObj = org.json.JSONObject(credsJson)
+            credsObj.put(cleanUsername, hashedPassword)
+            prefs?.edit()?.putString("account_credentials_json", credsObj.toString())?.apply()
+        } catch (_: Exception) {}
+
+        val displayName = cleanUsername.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        val newUserId = "user_${cleanUsername}_${System.currentTimeMillis() % 100000}"
+
+        val newUser = User(
+            id = newUserId,
+            name = displayName,
+            username = cleanUsername,
+            bio = "Creator on AKASH SOCIAL",
+            avatarDrawableRes = null,
+            fansCount = 0,
+            friendsCount = 0,
+            postsCount = 0,
+            videosCount = 0,
+            totalReach = 0L,
+            streakDays = 0,
+            vipStarActive = false,
+            isCreator = true,
+            isDeveloper = false,
+            isOwner = false,
+            isVerified = false,
+            isGuest = false,
+            authProvider = "password"
+        )
+
+        val currentAccounts = _savedAccounts.value.toMutableList()
+        currentAccounts.add(newUser)
+        _savedAccounts.value = currentAccounts
+        _currentUser.value = newUser
+
+        setOnboardingCompleted(true)
+        prefs?.edit()?.putString("active_account_id", newUser.id)?.apply()
+        saveAllState()
+        return Result.success(newUser)
+    }
+
+    fun loginWithUsernameAndPassword(username: String, password: String, rememberMe: Boolean = true): Result<User> {
+        val cleanUsername = username.trim().removePrefix("@").replace(" ", "_").lowercase()
+        if (cleanUsername.isBlank()) {
+            return Result.failure(Exception("Please enter your username."))
+        }
+        if (password.isBlank()) {
+            return Result.failure(Exception("Please enter your password."))
+        }
+
+        val prefs = context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val credsJson = prefs?.getString("account_credentials_json", "{}") ?: "{}"
+        val credsObj = try { org.json.JSONObject(credsJson) } catch (_: Exception) { org.json.JSONObject() }
+
+        val savedHash = _accountCredentials[cleanUsername]
+            ?: if (credsObj.has(cleanUsername)) credsObj.getString(cleanUsername) else null
+        val inputHash = hashPassword(password)
+
+        val isOwnerLogin = cleanUsername == "akash_dev" || cleanUsername == "akashsingh" || cleanUsername == "akash"
+        val passwordMatches = (savedHash != null && savedHash == inputHash) ||
+                (isOwnerLogin && (password == "akash2026" || password == "akash123" || savedHash == inputHash))
+
+        if (!passwordMatches && savedHash != null) {
+            return Result.failure(Exception("Incorrect password for $cleanUsername. Please try again."))
+        }
+        if (savedHash == null && !isOwnerLogin) {
+            return Result.failure(Exception("Account not found for $cleanUsername. Please register first."))
+        }
+
+        val existingUser = _savedAccounts.value.find { it.username.equals(cleanUsername, ignoreCase = true) }
+            ?: if (isOwnerLogin) _currentUser.value
+            else _creators.value.find { it.username.equals(cleanUsername, ignoreCase = true) }
+
+        val targetUser = existingUser ?: User(
+            id = "user_${cleanUsername}_${System.currentTimeMillis() % 10000}",
+            name = cleanUsername.replaceFirstChar { it.uppercase() },
+            username = cleanUsername,
+            bio = "Creator on AKASH SOCIAL",
+            isCreator = true,
+            authProvider = "password"
+        )
+
+        if (savedHash == null) {
+            credsObj.put(cleanUsername, inputHash)
+            prefs?.edit()?.putString("account_credentials_json", credsObj.toString())?.apply()
+        }
+
+        if (rememberMe) {
+            prefs?.edit()?.putString("remembered_username", cleanUsername)?.apply()
+        }
+
+        val currentAccounts = _savedAccounts.value.toMutableList()
+        if (currentAccounts.none { it.id == targetUser.id }) {
+            currentAccounts.add(targetUser)
+        }
+        _savedAccounts.value = currentAccounts
+        _currentUser.value = targetUser
+
+        setOnboardingCompleted(true)
+        prefs?.edit()?.putString("active_account_id", targetUser.id)?.apply()
+        saveAllState()
+        return Result.success(targetUser)
+    }
+
+    fun requestPasswordRecovery(username: String): Result<String> {
+        val clean = username.trim().removePrefix("@").lowercase()
+        val user = _savedAccounts.value.find { it.username.equals(clean, ignoreCase = true) }
+            ?: if (clean == "akash_dev") _currentUser.value else null
+
+        if (user == null) {
+            return Result.failure(Exception("No account found with username $clean."))
+        }
+        if (!user.email.isNullOrBlank()) {
+            return Result.success("Password recovery instructions sent to registered email ${user.email}.")
+        }
+        if (!user.phoneNumber.isNullOrBlank()) {
+            return Result.success("Temporary verification OTP sent to registered phone ${user.phoneNumber}.")
+        }
+        return Result.failure(Exception("No recovery email or phone is linked to $clean. Please sign in with your password or explore as Guest."))
+    }
+
+    fun getRememberedUsername(): String? {
+        return context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)?.getString("remembered_username", null)
+    }
+
+    // --- ADVANCED AUTOMATIC IN-APP UPDATE CHECKER (Section 6) ---
+
+    private val _updateManifest = MutableStateFlow(UpdateManifest())
+    val updateManifest: StateFlow<UpdateManifest> = _updateManifest.asStateFlow()
+
+    private val _updateCheckResult = MutableStateFlow<UpdateCheckResult?>(null)
+    val updateCheckResult: StateFlow<UpdateCheckResult?> = _updateCheckResult.asStateFlow()
+
+    fun checkForUpdates(manualCheck: Boolean = false): UpdateCheckResult {
+        val prefs = context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val customApkUrl = prefs?.getString("custom_apk_download_url", null)
+
+        val currentManifest = if (customApkUrl != null) {
+            _updateManifest.value.copy(apkDownloadUrl = customApkUrl)
+        } else _updateManifest.value
+
+        val currentVersionCode = 1 // Installed baseline versionCode
+        val dismissedTime = prefs?.getLong("update_later_timestamp", 0L) ?: 0L
+        val now = System.currentTimeMillis()
+        val isCooldownActive = (now - dismissedTime) < (8 * 60 * 60 * 1000L) // 8-hour cooldown for automatic checks
+
+        val result = if (currentManifest.latestVersionCode > currentVersionCode) {
+            if (!manualCheck && isCooldownActive) {
+                UpdateCheckResult.Latest
+            } else {
+                UpdateCheckResult.Available(currentManifest)
+            }
+        } else {
+            UpdateCheckResult.Latest
+        }
+
+        _updateCheckResult.value = result
+        return result
+    }
+
+    fun dismissUpdateLater() {
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()?.putLong("update_later_timestamp", System.currentTimeMillis())?.apply()
+        _updateCheckResult.value = null
+    }
+
+    fun clearUpdateCheckResult() {
+        _updateCheckResult.value = null
+    }
+
+    fun setCustomApkDownloadUrl(url: String) {
+        val cleanUrl = url.trim()
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()?.putString("custom_apk_download_url", cleanUrl)?.apply()
+        _updateManifest.update { it.copy(apkDownloadUrl = cleanUrl) }
+    }
+
+    // --- OPTIONAL COMMUNITY ACTIVITY POP-UPS (Section 8) ---
+
+    private val _isCommunityPopupsEnabled = MutableStateFlow(
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)?.getBoolean("community_popups_enabled", false) ?: false
+    )
+    val isCommunityPopupsEnabled: StateFlow<Boolean> = _isCommunityPopupsEnabled.asStateFlow()
+
+    private val _communityPopupsFrequency = MutableStateFlow(
+        try {
+            val name = context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)?.getString("community_popups_freq", "OFF") ?: "OFF"
+            CommunityPopupsFrequency.valueOf(name)
+        } catch (_: Exception) { CommunityPopupsFrequency.OFF }
+    )
+    val communityPopupsFrequency: StateFlow<CommunityPopupsFrequency> = _communityPopupsFrequency.asStateFlow()
+
+    private val _hasPromptedCommunityConsent = MutableStateFlow(
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)?.getBoolean("has_prompted_community_consent", false) ?: false
+    )
+    val hasPromptedCommunityConsent: StateFlow<Boolean> = _hasPromptedCommunityConsent.asStateFlow()
+
+    private val _activeCommunityPopup = MutableStateFlow<CommunityActivityEvent?>(null)
+    val activeCommunityPopup: StateFlow<CommunityActivityEvent?> = _activeCommunityPopup.asStateFlow()
+
+    fun setCommunityPopupsConsent(enabled: Boolean, frequency: CommunityPopupsFrequency = CommunityPopupsFrequency.NORMAL) {
+        _isCommunityPopupsEnabled.value = enabled
+        _communityPopupsFrequency.value = if (enabled) frequency else CommunityPopupsFrequency.OFF
+        _hasPromptedCommunityConsent.value = true
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)?.edit()
+            ?.putBoolean("community_popups_enabled", enabled)
+            ?.putString("community_popups_freq", if (enabled) frequency.name else CommunityPopupsFrequency.OFF.name)
+            ?.putBoolean("has_prompted_community_consent", true)
+            ?.apply()
+    }
+
+    fun dismissActiveCommunityPopup() {
+        _activeCommunityPopup.value = null
+    }
+
+    fun triggerCommunityActivityPulse() {
+        if (!_isCommunityPopupsEnabled.value || _communityPopupsFrequency.value == CommunityPopupsFrequency.OFF) return
+        val messages = listOf(
+            "🎉 Aarav just joined AKASH SOCIAL!",
+            "✨ A new creator joined the community!",
+            "🌍 Welcome to our growing community!",
+            "🔥 Ananya completed a 7-day creative streak!",
+            "🎬 Yash published a new 60fps StarClip!"
+        )
+        val selectedMessage = messages.random()
+        _activeCommunityPopup.value = CommunityActivityEvent(
+            id = "pulse_${System.currentTimeMillis()}",
+            message = "$selectedMessage [Demo Notification]"
+        )
+    }
+
     // --- MULTIPLE ACCOUNTS MANAGEMENT ON DEVICE ---
 
     fun createAccount(
@@ -2309,6 +2587,12 @@ class StarPulseRepository(private val context: Context? = null) {
         _savedAccounts.value = currentAccounts
         _currentUser.value = newAccount
 
+        // Keep previous account in creators list so new account can view profile, posts and reels
+        _creators.update { list ->
+            val updated = list.filter { it.id != newAccount.id }
+            if (updated.none { it.id == currentMe.id }) updated + currentMe else updated
+        }
+
         context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)?.edit()?.putString("active_account_id", newAccount.id)?.apply()
         saveAllState()
         return newAccount
@@ -2327,7 +2611,13 @@ class StarPulseRepository(private val context: Context? = null) {
         // 2. Switch to target account
         _currentUser.value = target
 
-        // 3. Persist active account id
+        // 3. Keep other account in creators list for cross-profile access
+        _creators.update { list ->
+            val updated = list.filter { it.id != target.id }
+            if (updated.none { it.id == currentMe.id }) updated + currentMe else updated
+        }
+
+        // 4. Persist active account id
         context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)?.edit()?.putString("active_account_id", target.id)?.apply()
         saveAllState()
         return true

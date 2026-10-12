@@ -142,6 +142,48 @@ class StarPulseViewModel(
     val reports = repository.reports
     val isModeratorAuthenticated = repository.isModeratorAuthenticated
 
+    // --- Automatic Update Checker & Manifest (Section 6) ---
+    val updateCheckResult: StateFlow<UpdateCheckResult?> = repository.updateCheckResult
+    val updateManifest: StateFlow<UpdateManifest> = repository.updateManifest
+
+    // --- Optional Community Activity Pop-ups (Section 8) ---
+    val isCommunityPopupsEnabled: StateFlow<Boolean> = repository.isCommunityPopupsEnabled
+    val communityPopupsFrequency: StateFlow<CommunityPopupsFrequency> = repository.communityPopupsFrequency
+    val hasPromptedCommunityConsent: StateFlow<Boolean> = repository.hasPromptedCommunityConsent
+    val activeCommunityPopup: StateFlow<CommunityActivityEvent?> = repository.activeCommunityPopup
+
+    // App Settings Dialog
+    private val _isAppSettingsOpen = MutableStateFlow(false)
+    val isAppSettingsOpen: StateFlow<Boolean> = _isAppSettingsOpen.asStateFlow()
+
+    init {
+        // Automatic Feed shimmer resolution after initial load
+        viewModelScope.launch {
+            delay(900)
+            _isFeedLoading.value = false
+        }
+
+        // Automatic version check on app start (Section 6)
+        viewModelScope.launch {
+            delay(2000)
+            repository.checkForUpdates(manualCheck = false)
+        }
+
+        // Occasional Community Activity pulses (Section 8)
+        viewModelScope.launch {
+            while (true) {
+                delay(45000)
+                if (repository.isCommunityPopupsEnabled.value &&
+                    repository.communityPopupsFrequency.value != CommunityPopupsFrequency.OFF &&
+                    activeCall.value == null &&
+                    activeLiveStreamId.value == null
+                ) {
+                    repository.triggerCommunityActivityPulse()
+                }
+            }
+        }
+    }
+
     fun selectTab(tab: MainTab) {
         _currentTab.value = tab
     }
@@ -493,5 +535,68 @@ class StarPulseViewModel(
             delay(600)
             _isProfileLoading.value = false
         }
+    }
+
+    // --- Update Checker Actions (Section 6) ---
+    fun checkForUpdates(manualCheck: Boolean = false) {
+        viewModelScope.launch {
+            repository.checkForUpdates(manualCheck = manualCheck)
+        }
+    }
+
+    fun dismissUpdateLater() {
+        repository.dismissUpdateLater()
+    }
+
+    fun clearUpdateCheckResult() {
+        repository.clearUpdateCheckResult()
+    }
+
+    // --- Community Pop-ups Actions (Section 8) ---
+    fun setCommunityPopupsConsent(enabled: Boolean, frequency: CommunityPopupsFrequency = CommunityPopupsFrequency.NORMAL) {
+        repository.setCommunityPopupsConsent(enabled, frequency)
+    }
+
+    fun dismissActiveCommunityPopup() {
+        repository.dismissActiveCommunityPopup()
+    }
+
+    // --- App Settings Dialog Controls ---
+    fun openAppSettings() {
+        _isAppSettingsOpen.value = true
+    }
+
+    fun closeAppSettings() {
+        _isAppSettingsOpen.value = false
+    }
+
+    // --- Authentication Actions (Section 2, 3, 4) ---
+    fun loginWithUsernameAndPassword(username: String, password: String, rememberMe: Boolean = true): Result<User> {
+        val result = repository.loginWithUsernameAndPassword(username, password, rememberMe)
+        if (result.isSuccess) {
+            _isOnboardingActive.value = false
+        }
+        return result
+    }
+
+    fun registerWithUsernameAndPassword(username: String, password: String): Result<User> {
+        val result = repository.registerWithUsernameAndPassword(username, password)
+        if (result.isSuccess) {
+            _isOnboardingActive.value = false
+        }
+        return result
+    }
+
+    fun isUsernameAvailable(username: String): Boolean {
+        return repository.isUsernameAvailable(username)
+    }
+
+    fun logout() {
+        repository.setOnboardingCompleted(false)
+        _isOnboardingActive.value = true
+    }
+
+    fun openLogin() {
+        _isOnboardingActive.value = true
     }
 }

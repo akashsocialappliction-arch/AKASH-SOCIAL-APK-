@@ -35,6 +35,7 @@ fun StarPulseTopBar(
     onMessagesClick: () -> Unit,
     onAdminClick: () -> Unit,
     onSupportClick: () -> Unit,
+    onSettingsClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -180,6 +181,19 @@ fun StarPulseTopBar(
                         contentDescription = "Admin & Continuous Improvement Center",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                if (onSettingsClick != null) {
+                    IconButton(
+                        onClick = onSettingsClick,
+                        modifier = Modifier.testTag("top_bar_settings_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Settings,
+                            contentDescription = "Settings & Updates",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }

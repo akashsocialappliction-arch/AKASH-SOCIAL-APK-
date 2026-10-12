@@ -5,9 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,13 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.model.CallType
-import com.example.model.PostType
+import androidx.compose.ui.Alignment
+import com.example.model.*
 import com.example.ui.MainTab
 import com.example.ui.StarPulseViewModel
-import com.example.ui.components.StarPulseBottomBar
-import com.example.ui.components.StarPulseTopBar
-import com.example.ui.components.shareAppInvite
+import com.example.ui.components.*
 import com.example.ui.screens.*
 import com.example.ui.theme.StarPulseTheme
 
@@ -63,6 +60,19 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
     val isFeedLoading by viewModel.isFeedLoading.collectAsStateWithLifecycle()
     val isProfileLoading by viewModel.isProfileLoading.collectAsStateWithLifecycle()
     val savedAccounts by viewModel.savedAccounts.collectAsStateWithLifecycle()
+    val isAccountSwitcherOpen by viewModel.isAccountSwitcherOpen.collectAsStateWithLifecycle()
+    val isCreateAccountOpen by viewModel.isCreateAccountOpen.collectAsStateWithLifecycle()
+
+    // Auth & Onboarding State
+    val isOnboardingActive by viewModel.isOnboardingActive.collectAsStateWithLifecycle()
+
+    // Update Checker & Community Pop-ups States
+    val updateCheckResult by viewModel.updateCheckResult.collectAsStateWithLifecycle()
+    val isCommunityPopupsEnabled by viewModel.isCommunityPopupsEnabled.collectAsStateWithLifecycle()
+    val communityPopupsFrequency by viewModel.communityPopupsFrequency.collectAsStateWithLifecycle()
+    val hasPromptedCommunityConsent by viewModel.hasPromptedCommunityConsent.collectAsStateWithLifecycle()
+    val activeCommunityPopup by viewModel.activeCommunityPopup.collectAsStateWithLifecycle()
+    val isAppSettingsOpen by viewModel.isAppSettingsOpen.collectAsStateWithLifecycle()
 
     // Secondary screen states
     val viewingCreatorId by viewModel.viewingCreatorId.collectAsStateWithLifecycle()
@@ -116,6 +126,20 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
             isViewingHelpSupport -> viewModel.closeHelpSupport()
             viewingCreatorId != null -> viewModel.closeCreatorProfile()
         }
+    }
+
+    // Premium Glassmorphism Login Screen (Section 2 & 3)
+    if (isOnboardingActive) {
+        LoginScreen(
+            onLoginSuccess = { viewModel.completeOnboarding() },
+            onLoginWithUsernamePassword = { u, p, rem -> viewModel.loginWithUsernameAndPassword(u, p, rem) },
+            onRegisterWithUsernamePassword = { u, p -> viewModel.registerWithUsernameAndPassword(u, p) },
+            isUsernameAvailable = { u -> viewModel.isUsernameAvailable(u) },
+            onExploreAsGuest = { viewModel.exploreAsGuest() },
+            onContinueWithGoogle = { viewModel.loginWithGoogle("Google Creator", "creator.google@gmail.com") },
+            onContinueWithPhone = { phone, otp -> viewModel.loginWithPhone(phone, otp) }
+        )
+        return
     }
 
     // Call Overlay takes highest priority
@@ -191,7 +215,8 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
                     onNotificationsClick = { viewModel.openNotifications() },
                     onMessagesClick = { viewModel.openConversationsList() },
                     onAdminClick = { viewModel.openAdminUpdateCenter() },
-                    onSupportClick = { viewModel.openHelpSupport() }
+                    onSupportClick = { viewModel.openHelpSupport() },
+                    onSettingsClick = { viewModel.openAppSettings() }
                 )
             }
         },
@@ -290,8 +315,29 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
 
                 // Viewing Another Creator's Profile
                 viewingCreatorId != null -> {
-                    val targetUser = if (viewingCreatorId == currentUser.id) currentUser
-                    else creators.find { it.id == viewingCreatorId } ?: currentUser
+                    val targetUser = if (viewingCreatorId == currentUser.id) {
+                        currentUser
+                    } else {
+                        creators.find { it.id == viewingCreatorId }
+                            ?: savedAccounts.find { it.id == viewingCreatorId }
+                            ?: posts.find { it.authorId == viewingCreatorId }?.let { p ->
+                                com.example.model.User(
+                                    id = p.authorId,
+                                    name = p.authorName,
+                                    username = p.authorUsername.removePrefix("@"),
+                                    bio = "Creator on AKASH SOCIAL",
+                                    avatarDrawableRes = p.authorAvatarRes,
+                                    isCreator = p.authorHasCreatorBadge,
+                                    isDeveloper = p.authorHasDeveloperBadge,
+                                    vipStarActive = p.authorHasVipStar,
+                                    fansCount = 145,
+                                    postsCount = posts.count { it.authorId == p.authorId },
+                                    videosCount = posts.count { it.authorId == p.authorId && (it.type == PostType.STAR_CLIP || it.type == PostType.REEL || it.type == PostType.VIDEO) },
+                                    totalReach = posts.filter { it.authorId == p.authorId }.sumOf { it.reachCount }
+                                )
+                            }
+                            ?: currentUser
+                    }
 
                     val authorPosts = posts.filter { it.authorId == targetUser.id }
                     ProfileScreen(
@@ -468,6 +514,89 @@ fun StarPulseApp(viewModel: StarPulseViewModel = viewModel()) {
                     onConfirm = { reason -> viewModel.reportTarget(reason) },
                     onDismiss = { viewModel.dismissReport() }
                 )
+            }
+
+            // Automatic Update Checker Dialogs (Section 6)
+            when (val updateRes = updateCheckResult) {
+                is UpdateCheckResult.Available -> {
+                    UpdateAvailableDialog(
+                        manifest = updateRes.manifest,
+                        onDownload = { url -> openApkDownloadInBrowser(context, url) },
+                        onLater = { viewModel.dismissUpdateLater() },
+                        onDismiss = { viewModel.clearUpdateCheckResult() }
+                    )
+                }
+                is UpdateCheckResult.Latest -> {
+                    UpToDateDialog(
+                        onDismiss = { viewModel.clearUpdateCheckResult() }
+                    )
+                }
+                is UpdateCheckResult.Error -> {
+                    UpdateErrorDialog(
+                        errorMessage = updateRes.message,
+                        onRetry = { viewModel.checkForUpdates(manualCheck = true) },
+                        onDismiss = { viewModel.clearUpdateCheckResult() }
+                    )
+                }
+                null -> {}
+            }
+
+            // Community Activity Pop-ups Consent Dialog (Section 8)
+            if (!hasPromptedCommunityConsent && !isOnboardingActive) {
+                CommunityConsentDialog(
+                    onEnable = { freq -> viewModel.setCommunityPopupsConsent(true, freq) },
+                    onNotNow = { viewModel.setCommunityPopupsConsent(false) }
+                )
+            }
+
+            // App Settings Dialog
+            if (isAppSettingsOpen) {
+                AppSettingsDialog(
+                    currentUser = currentUser,
+                    isCommunityPopupsEnabled = isCommunityPopupsEnabled,
+                    communityFrequency = communityPopupsFrequency,
+                    onSetCommunityPopupsConsent = { enabled, freq -> viewModel.setCommunityPopupsConsent(enabled, freq) },
+                    onCheckForUpdates = { viewModel.checkForUpdates(manualCheck = true) },
+                    onSwitchAccount = { viewModel.openAccountSwitcher() },
+                    onLogout = { viewModel.logout() },
+                    onDismiss = { viewModel.closeAppSettings() }
+                )
+            }
+
+            // Multi-Account Switcher & Creation Dialogs
+            if (isAccountSwitcherOpen) {
+                AccountSwitcherBottomSheet(
+                    currentUserId = currentUser.id,
+                    accounts = if (savedAccounts.isNotEmpty()) savedAccounts else listOf(currentUser),
+                    onSwitchAccount = { userId -> viewModel.switchAccount(userId) },
+                    onOpenCreateAccount = { viewModel.openCreateAccount() },
+                    onDismiss = { viewModel.closeAccountSwitcher() }
+                )
+            }
+
+            if (isCreateAccountOpen) {
+                CreateAccountDialog(
+                    onConfirm = { name, username, bio, isCreator ->
+                        viewModel.createNewAccount(name, username, bio, isCreator)
+                        viewModel.closeCreateAccount()
+                    },
+                    onDismiss = { viewModel.closeCreateAccount() }
+                )
+            }
+
+            // Floating Community Activity Notification (Section 8)
+            if (activeCall == null && !isCameraStudioOpen && activeLiveStreamId == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .padding(top = 10.dp)
+                ) {
+                    CommunityActivityFloatingPill(
+                        event = activeCommunityPopup,
+                        onDismiss = { viewModel.dismissActiveCommunityPopup() }
+                    )
+                }
             }
         }
     }

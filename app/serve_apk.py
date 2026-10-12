@@ -14,10 +14,12 @@ class APKHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def guess_type(self, path):
         if path.endswith(".apk"):
             return "application/vnd.android.package-archive"
+        if path.endswith(".zip"):
+            return "application/zip"
         return super().guess_type(path)
 
     def end_headers(self):
-        if self.path.endswith(".apk"):
+        if self.path.endswith(".apk") or self.path.endswith(".zip"):
             filename = os.path.basename(self.path)
             self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
             self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")

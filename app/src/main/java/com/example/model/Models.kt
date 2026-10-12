@@ -299,3 +299,33 @@ data class CreatorSpotlight(
     val spotlightScore: Int = 98
 )
 
+data class UpdateManifest(
+    val latestVersionName: String = "1.1.0",
+    val latestVersionCode: Int = 2,
+    val apkDownloadUrl: String = "https://ais-pre-nbduqyjp2ctwlyv7a2wxcb-764182476745.asia-southeast1.run.app/AKASH_SOCIAL_NAGOD.apk",
+    val releaseNotes: String = "• Premium Purple & Magenta Glassmorphism Authentication UI\n• Fast account creation requiring only Username & Password\n• Instant multi-account switching on one device\n• Skeleton / Shimmer loading states for Feed and Profile\n• Automatic in-app update checker with verified release notes\n• Community Activity pop-up notifications with user consent",
+    val minSupportedVersionCode: Int = 1,
+    val isMandatory: Boolean = false,
+    val apkChecksum: String? = "sha256:7b91c01e5df"
+)
+
+sealed class UpdateCheckResult {
+    data class Available(val manifest: UpdateManifest) : UpdateCheckResult()
+    object Latest : UpdateCheckResult()
+    data class Error(val message: String) : UpdateCheckResult()
+}
+
+enum class CommunityPopupsFrequency {
+    OFF,
+    LOW,
+    NORMAL
+}
+
+data class CommunityActivityEvent(
+    val id: String,
+    val message: String,
+    val isDemo: Boolean = true,
+    val timestampMs: Long = System.currentTimeMillis()
+)
+
+

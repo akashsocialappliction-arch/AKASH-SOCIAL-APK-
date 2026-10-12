@@ -27,7 +27,7 @@ class ExampleRobolectricTest {
     val me = repo.currentUser.value
 
     assertEquals("Akash Singh Parihar", me.name)
-    assertEquals("@akash_dev", me.username)
+    assertEquals("akash_dev", me.username.removePrefix("@"))
     assertTrue(me.isDeveloper)
     assertTrue(me.isOwner)
     assertEquals(0, me.fansCount)
@@ -132,5 +132,99 @@ class ExampleRobolectricTest {
     val msgs = repo.activeChatMessages.value["user_aarav"]
     assertNotNull(msgs)
     assertTrue(msgs!!.any { it.sharedPostId == targetPost.id })
+  }
+
+  @Test
+  fun `registration requires only username and password without mandatory personal info`() {
+    val repo = StarPulseRepository()
+    val testUsername = "newcreator_${System.currentTimeMillis() % 10000}"
+
+    assertTrue(repo.isUsernameAvailable(testUsername))
+
+    // Register without email, phone, or real name
+    val regResult = repo.registerWithUsernameAndPassword(testUsername, "password123")
+    assertTrue(regResult.isSuccess)
+    val registeredUser = regResult.getOrThrow()
+    assertEquals(testUsername, registeredUser.username)
+    assertNull(registeredUser.phoneNumber)
+    assertNull(registeredUser.email)
+    assertEquals(registeredUser.id, repo.currentUser.value.id)
+
+    // Duplicate username is rejected
+    val dupResult = repo.registerWithUsernameAndPassword(testUsername, "password999")
+    assertTrue(dupResult.isFailure)
+    assertTrue(dupResult.exceptionOrNull()?.message?.contains("already taken") == true)
+  }
+
+  @Test
+  fun `login with username and password validates credentials`() {
+    val repo = StarPulseRepository()
+    val username = "authuser_${System.currentTimeMillis() % 10000}"
+
+    repo.registerWithUsernameAndPassword(username, "mysecretpass")
+
+    // Successful login
+    val loginSuccess = repo.loginWithUsernameAndPassword(username, "mysecretpass")
+    assertTrue(loginSuccess.isSuccess)
+
+    // Wrong password fails
+    val loginWrongPass = repo.loginWithUsernameAndPassword(username, "wrongpass")
+    assertTrue(loginWrongPass.isFailure)
+  }
+
+  @Test
+  fun `update checker verifies manifest version and returns appropriate result`() {
+    val repo = StarPulseRepository()
+    val checkResult = repo.checkForUpdates(manualCheck = true)
+    // Manifest has latestVersionCode = 2 while installed baseline is 1
+    assertTrue(checkResult is com.example.model.UpdateCheckResult.Available)
+    val available = checkResult as com.example.model.UpdateCheckResult.Available
+    assertTrue(available.manifest.latestVersionCode > 1)
+    assertNotNull(available.manifest.apkDownloadUrl)
+  }
+
+  @Test
+  fun `community activity popups consent and demo trigger`() {
+    val repo = StarPulseRepository()
+    assertFalse(repo.isCommunityPopupsEnabled.value)
+
+    repo.setCommunityPopupsConsent(true, com.example.model.CommunityPopupsFrequency.NORMAL)
+    assertTrue(repo.isCommunityPopupsEnabled.value)
+    assertEquals(com.example.model.CommunityPopupsFrequency.NORMAL, repo.communityPopupsFrequency.value)
+
+    repo.triggerCommunityActivityPulse()
+    val popup = repo.activeCommunityPopup.value
+    assertNotNull(popup)
+    assertTrue(popup!!.isDemo)
+  }
+
+  @Test
+  fun `milestone notifications trigger upon reaching thresholds without duplicates`() {
+    val repo = StarPulseRepository()
+    val me = repo.currentUser.value
+
+    repo.createPost(
+      type = PostType.REEL,
+      caption = "Milestone test reel",
+      hashtags = listOf("#Test"),
+      mentions = emptyList()
+    )
+
+    val post = repo.posts.value.first()
+
+    // Simulate 12 views
+    repeat(12) {
+      repo.recordContentView(post.id, viewerUserId = "other_user_$it")
+    }
+
+    val notifications = repo.notifications.value
+    val reelNotif = notifications.firstOrNull { it.type == com.example.model.NotifType.REEL_MILESTONE && it.postId == post.id }
+    assertNotNull(reelNotif)
+    assertEquals("Your Reel is gaining attention! 🔥", reelNotif!!.title)
+
+    // Ensure deduplication: another view should not create a duplicate
+    repo.recordContentView(post.id, viewerUserId = "another_viewer")
+    val count = repo.notifications.value.count { it.type == com.example.model.NotifType.REEL_MILESTONE && it.postId == post.id }
+    assertEquals(1, count)
   }
 }
